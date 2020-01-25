@@ -40,7 +40,7 @@ for name in fileNames:
 
 ## Update pickel to reflect current directory folders
 dataFrame = pd.read_pickle(args.f + "/catalog.helios.public.20100101-20160101.pkl")
-print(dataFrame.head())
+print("Updating dataframe... this may take a while!")
 for i, row in dataFrame.iterrows():
 
     if (row.hdf5_8bit_path == "nan"):
