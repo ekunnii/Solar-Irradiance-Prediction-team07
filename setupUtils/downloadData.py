@@ -4,12 +4,16 @@
 ## Line execution example: >>> python3 downloadData.py -u USER_NAME -f ~/data -s 2011.12
 ##                This command return the pickel file and all the images from the moth of Feb 2011
 ##                If you run the script twice, it will not download files again if they don't need to be updated.
+##
+##
+## For windows execution: use ubuntu subsystem for linux and the directory should start with /mnt/c/...
+##                        
 ######################################
 
 import subprocess
 import sys, os
 import argparse
-import pandas as pd
+#import pandas as pd
 
 parser = argparse.ArgumentParser(description='Process some integers.')
 
@@ -18,6 +22,9 @@ parser.add_argument("-f", help="File location for loca storage")
 parser.add_argument("-s", help="The iamge file name start. Example to get images from the month of Feb in 2011: 2011.02")
 
 args = parser.parse_args()
+
+if not os.path.exists(args.f):
+    os.makedirs(args.f)
 
 # Get pickel file
 subprocess.run(["rsync", "-P", "-u", args.u + "@helios3.calculquebec.ca:/project/cq-training-1/project1/data/catalog.helios.public.20100101-20160101.pkl", args.f + "/catalog.helios.public.20100101-20160101.pkl"])
