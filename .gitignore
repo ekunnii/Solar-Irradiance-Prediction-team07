@@ -2,3 +2,5 @@
 .ipynb_checkpoints
 *.out
 solar_env
+data
+__pycache__

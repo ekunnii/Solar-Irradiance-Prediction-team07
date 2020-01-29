@@ -8,13 +8,13 @@ Team memeber:
 - Daigle, Maxime
 
 ## Installation
-We assumen you have python3.7 on Linux or windows
+We assume that you have python3.7 on Linux or windows
 
 On linux, you can use virtualenv to manage virtual env
 
 ```
 ProjectPath=/path/to/project/repo
-virtualenv --no-download ${ProjectPath}/solar_env
+virtualenv --python=python3.7 --no-download ${ProjectPath}/solar_env
 source ${ProjectPath}/solar_env/bin/activate
 pip3 install -r requirements.txt
 ```
