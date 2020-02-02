@@ -9,6 +9,10 @@ import numpy as np
 import tensorflow as tf
 import tqdm
 
+import sys,inspect
+sys.path.insert(1, os.path.join(sys.path[0], '..'))
+from models.model_factory import ModelFactory
+
 
 def prepare_dataloader(
         dataframe: pd.DataFrame,
@@ -63,13 +67,11 @@ def prepare_dataloader(
         image_dim = (64, 64)
         n_channels = 5
         output_seq_len = 4
-        
+
         for i in range(0, len(target_datetimes), batch_size):
             batch_of_datetimes = target_datetimes[i:i+batch_size]
             # This is evaluator, so there is timestamp for test time.
             # Which training, do we need to specify the datetimes? or we can get all data?
-            
-                
 
             samples = tf.random.uniform(shape=(
                 len(batch_of_datetimes), image_dim[0], image_dim[1], n_channels
@@ -99,37 +101,12 @@ def prepare_model(
 
     See https://github.com/mila-iqia/ift6759/tree/master/projects/project1/evaluation.md for more information.
 
-    Args:
-        stations: a map of station names of interest paired with their coordinates (latitude, longitude, elevation).
-        target_time_offsets: the list of timedeltas to predict GHIs for (by definition: [T=0, T+1h, T+3h, T+6h]).
-        config: configuration dictionary holding any extra parameters that might be required by the user. These
-            parameters are loaded automatically if the user provided a JSON file in their submission. Submitting
-            such a JSON file is completely optional, and this argument can be ignored if not needed.
-
-    Returns:
-        A ``tf.keras.Model`` object that can be used to generate new GHI predictions given imagery tensors.
     """
-
     ################################### MODIFY BELOW ##################################
-
-    class DummyModel(tf.keras.Model):
-
-        def __init__(self, target_time_offsets):
-            super(DummyModel, self).__init__()
-            self.flatten = tf.keras.layers.Flatten()
-            self.dense1 = tf.keras.layers.Dense(32, activation=tf.nn.relu)
-            self.dense2 = tf.keras.layers.Dense(
-                len(target_time_offsets), activation=tf.nn.softmax)
-
-        def call(self, inputs):
-            x = self.dense1(self.flatten(inputs))
-            return self.dense2(x)
-
-    model = DummyModel(target_time_offsets)
-
+    # Team 7 model factory
+    factory = ModelFactory(stations, target_time_offsets, config)
+    return factory.BuildDummyModel()
     ################################### MODIFY ABOVE ##################################
-
-    return model
 
 
 def generate_predictions(data_loader: tf.data.Dataset, model: tf.keras.Model, pred_count: int) -> np.ndarray:
@@ -237,19 +214,19 @@ def main(
 
     user_config = {}
     if user_config_path:
-        assert os.path.isfile(
-            user_config_path), f"invalid user config file: {user_config_path}"
+        assert os.path.isfile(user_config_path), \
+            f"invalid user config file: {user_config_path}"
         with open(user_config_path, "r") as fd:
             user_config = json.load(fd)
 
-    assert os.path.isfile(
-        admin_config_path), f"invalid admin config file: {admin_config_path}"
+    assert os.path.isfile(admin_config_path), \
+        f"invalid admin config file: {admin_config_path}"
     with open(admin_config_path, "r") as fd:
         admin_config = json.load(fd)
 
     dataframe_path = admin_config["dataframe_path"]
-    assert os.path.isfile(
-        dataframe_path), f"invalid dataframe path: {dataframe_path}"
+    assert os.path.isfile(dataframe_path), \
+         f"invalid dataframe path: {dataframe_path}"
     dataframe = pd.read_pickle(dataframe_path)
 
     if "start_bound" in admin_config:
@@ -259,13 +236,10 @@ def main(
         dataframe = dataframe[dataframe.index < datetime.datetime.fromisoformat(
             admin_config["end_bound"])]
 
-    target_datetimes = [datetime.datetime.fromisoformat(
-        d) for d in admin_config["target_datetimes"]]
-    assert target_datetimes and all(
-        [d in dataframe.index for d in target_datetimes])
+    target_datetimes = [datetime.datetime.fromisoformat(d) for d in admin_config["target_datetimes"]]
+    assert target_datetimes and all([d in dataframe.index for d in target_datetimes])
     target_stations = admin_config["stations"]
-    target_time_offsets = [pd.Timedelta(d).to_pytimedelta(
-    ) for d in admin_config["target_time_offsets"]]
+    target_time_offsets = [pd.Timedelta(d).to_pytimedelta() for d in admin_config["target_time_offsets"]]
 
     if "bypass_predictions_path" in admin_config and admin_config["bypass_predictions_path"]:
         # re-open cached output if possible (for 2nd pass eval)

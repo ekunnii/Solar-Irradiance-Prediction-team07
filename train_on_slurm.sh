@@ -9,5 +9,5 @@ virtualenv --no-download $SLURM_TMPDIR/env
 source $SLURM_TMPDIR/env/bin/activate
 pip install --no-index tensorflow_gpu==2
 
-python ./train.py
+python ./train.py $PWD+"/train_config.json" --scratch_dir $SCRATCH 
 python ./test.py

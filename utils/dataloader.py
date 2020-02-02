@@ -72,12 +72,15 @@ def load_training(
         stations_data = {}
         if stations:
             df = pd.read_pickle(dataframe_path) if dataframe_path else None
+
             # assume lats/lons stay identical throughout all frames; just pick the first available arrays
             idx, lats, lons = 0, None, None
             while (lats is None or lons is None) and idx < archive_lut_size:
                 lats, lons = fetch_hdf5_sample(
                     "lat", h5_data, idx), fetch_hdf5_sample("lon", h5_data, idx)
+
             assert lats is not None and lons is not None, "could not fetch lats/lons arrays (hdf5 might be empty)"
+
             for reg, coords in tqdm.tqdm(stations.items(), desc="preparing stations data"):
                 station_coords = (
                     np.argmin(np.abs(lats - coords[0])), np.argmin(np.abs(lons - coords[1])))
@@ -88,8 +91,9 @@ def load_training(
                     station_data["csky"] = [
                         df.at[pd.Timestamp(t), reg + "_CLEARSKY_GHI"] for t in lut_timestamps]
                 stations_data[reg] = station_data
-        raw_data = np.zeros((archive_lut_size, len(
-            channels), 650, 1500, 3), dtype=np.uint8)
+
+        raw_data = np.zeros((archive_lut_size, len(channels), 650, 1500, 3), dtype=np.uint8)
+
         for channel_idx, channel_name in tqdm.tqdm(enumerate(channels), desc="preparing img data", total=len(channels)):
             assert channel_name in h5_data, f"missing channel: {channels}"
             norm_min = h5_data[channel_name].attrs.get("orig_min", None)
