@@ -1,3 +1,5 @@
 .vscode
 .ipynb_checkpoints
 *.out
+.DS_Store
+*.h5
