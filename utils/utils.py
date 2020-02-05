@@ -187,6 +187,10 @@ def fetch_hdf5_sample(
         array = decompress_array(dataset[sample_idx], compr_type=compr_type, dtype=orig_dtype, shape=orig_shape)
     return array
 
+def print_attrs(name, obj):
+    print (name)
+    for key, val in obj.attrs.items():
+        print ("    %s: %s" % (key, val))
 
 def viz_hdf5_imagery(
         hdf5_path: str,
@@ -203,6 +207,8 @@ def viz_hdf5_imagery(
     assert os.path.isfile(hdf5_path), f"invalid hdf5 path: {hdf5_path}"
     assert channels, "list of channels must not be empty"
     with h5py.File(hdf5_path, "r") as h5_data:
+        h5_data.visititems(print_attrs)
+        exit
         global_start_idx = h5_data.attrs["global_dataframe_start_idx"]
         global_end_idx = h5_data.attrs["global_dataframe_end_idx"]
         archive_lut_size = global_end_idx - global_start_idx
