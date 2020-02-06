@@ -195,21 +195,32 @@ def viz_hdf5_imagery(
         stations: typing.Optional[typing.Dict[str, typing.Tuple]] = None,
         copy_last_if_missing: bool = True,
 ) -> None:
+ 
+        
+        
+                
+                
+
+    
+
+    
     """Displays a looping visualization of the imagery channels saved in an HDF5 file.
     This visualization requires OpenCV3+ ('cv2'), and will loop while refreshing a local window until the program
     is killed, or 'q' is pressed. The visualization can also be paused by pressing the space bar.
     """
     assert os.path.isfile(hdf5_path), f"invalid hdf5 path: {hdf5_path}"
     assert channels, "list of channels must not be empty"
+    # Parsing h5py data
     with h5py.File(hdf5_path, "r") as h5_data:
         h5_data.visititems(print_attrs)
-        exit
+        # h5 data contains the start and end index to offset which image to get in the array
         global_start_idx = h5_data.attrs["global_dataframe_start_idx"]
         global_end_idx = h5_data.attrs["global_dataframe_end_idx"]
-        archive_lut_size = global_end_idx - global_start_idx
-        global_start_time = datetime.datetime.strptime(h5_data.attrs["global_dataframe_start_time"], "%Y.%m.%d.%H%M")
+        archive_lut_size = global_end_idx - global_start_idx# Number of images in the h5 file
+        global_start_time = datetime.datetime.strptime(h5_data.attrs["global_dataframe_start_time"], "%Y.%m.%d.%H%M") # The global start time is from 2011; first image date time
         lut_timestamps = [global_start_time + idx * datetime.timedelta(minutes=15) for idx in range(archive_lut_size)]
         # will only display GHI values if dataframe is available
+        # Read and extract station position in images
         stations_data = {}
         if stations:
             df = pd.read_pickle(dataframe_path) if dataframe_path else None
@@ -226,6 +237,8 @@ def viz_hdf5_imagery(
                     station_data["csky"] = [df.at[pd.Timestamp(t), reg + "_CLEARSKY_GHI"] for t in lut_timestamps]
                 stations_data[reg] = station_data
         raw_data = np.zeros((archive_lut_size, len(channels), 650, 1500, 3), dtype=np.uint8)
+
+        # Get chanel image information and store it in raw_data after transformations
         for channel_idx, channel_name in tqdm.tqdm(enumerate(channels), desc="preparing img data", total=len(channels)):
             assert channel_name in h5_data, f"missing channel: {channels}"
             norm_min = h5_data[channel_name].attrs.get("orig_min", None)
@@ -235,10 +248,13 @@ def viz_hdf5_imagery(
                 "one of the saved channels had an expected dimension"
             last_valid_array_idx = None
             for array_idx, array in enumerate(channel_data):
+                # If missing, copy previous valid one. 
                 if array is None:
                     if copy_last_if_missing and last_valid_array_idx is not None:
                         raw_data[array_idx, channel_idx, :, :] = raw_data[last_valid_array_idx, channel_idx, :, :]
                     continue
+                
+                # Otherwise, get image data
                 array = (((array.astype(np.float32) - norm_min) / (norm_max - norm_min)) * 255).astype(np.uint8)
                 array = cv.applyColorMap(array, cv.COLORMAP_BONE)
                 for station_idx, (station_name, station) in enumerate(stations_data.items()):
@@ -246,6 +262,8 @@ def viz_hdf5_imagery(
                     array = cv.circle(array, station["coords"][::-1], radius=9, color=station_color, thickness=-1)
                 raw_data[array_idx, channel_idx, :, :] = cv.flip(array, 0)
                 last_valid_array_idx = array_idx
+    
+    # This section is about the ghi value plotting, less interesting for imgage extraction
     plot_data = None
     if stations and dataframe_path:
         plot_data = preplot_live_ghi_curves(
@@ -269,6 +287,9 @@ def viz_hdf5_imagery(
         display_data.append(display)
     display = np.stack(display_data)
     array_idx, window_name, paused = 0, hdf5_path.split("/")[-1], False
+
+
+    # Infinite loop to display images and plots in window. 
     while True:
         cv.imshow(window_name, display[array_idx])
         ret = cv.waitKey(30 if not paused else 300)

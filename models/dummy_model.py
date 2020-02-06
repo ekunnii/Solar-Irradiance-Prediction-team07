@@ -9,6 +9,6 @@ class DummyModel(tf.keras.Model):
         self.dense2 = tf.keras.layers.Dense(
             len(target_time_offsets), activation=tf.nn.softmax)
 
-    def call(self, inputs):
-        x = self.dense1(self.flatten(inputs))
+    def call(self, metas, images):
+        x = self.dense1(self.flatten(self.flatten(images)))
         return self.dense2(x)
