@@ -59,33 +59,7 @@ def prepare_dataloader(
     # WE ARE PROVIDING YOU WITH A DUMMY DATA GENERATOR FOR DEMONSTRATION PURPOSES.
     # MODIFY EVERYTHINGIN IN THIS BLOCK AS YOU SEE FIT
 
-    def dummy_data_generator():
-        """
-        Generate dummy data for the model, only for example purposes.
-        """
-        batch_size = 32
-        image_dim = (64, 64)
-        n_channels = 5
-        output_seq_len = 4
-
-        for i in range(0, len(target_datetimes), batch_size):
-            batch_of_datetimes = target_datetimes[i:i+batch_size]
-            # This is evaluator, so there is timestamp for test time.
-            # Which training, do we need to specify the datetimes? or we can get all data?
-
-            samples = tf.random.uniform(shape=(
-                len(batch_of_datetimes), image_dim[0], image_dim[1], n_channels
-            ))
-            targets = tf.zeros(shape=(
-                len(batch_of_datetimes), output_seq_len
-            ))
-            # Remember that you do not have access to the targets.
-            # Your dataloader should handle this accordingly.
-            yield samples, targets
-
-    data_loader = tf.data.Dataset.from_generator(
-        dummy_data_generator, (tf.float32, tf.float32)
-    )
+    data_loader = BuildDataSet(dataframe, stations, target_time_offsets, config, target_datetimes = target_datetimes)
 
     ################################### MODIFY ABOVE ##################################
 
