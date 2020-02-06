@@ -539,7 +539,17 @@ def fetch_and_crop_hdf5_imagery(
     :param dataframe_path:
     :param copy_last_if_missing:
     :param cropped_img_size: size of the returned images
-    :return: numpy array of shape (96, number of stations, cropped_img_size, cropped_img_size) where 96 is the number of timestamps in a day
+    :return: numpy array
+    Returned array is of shape:
+    if cropped
+    (96 * number of stations, nb of channels,cropped_img_size, cropped_img_size)
+    where 96 is the number of timestamps in a day
+    where Returned_array[i*len(stations)+station_index] contains the images at ith timestamps of the station wanted
+    e.g the image at the 34th timestamps in the day of the 3rd station in the stations dictionnary (given as param) is at
+    Returned_array[33*len(stations)+2]
+
+    if not cropped
+    (96, nb of channels, original image height, original image width)
 
     Fetch images of a day and crop them
     """
@@ -626,6 +636,8 @@ def fetch_and_crop_hdf5_imagery(
                 paused = ~paused
             if not paused or ret == ord('c'):
                 array_idx = (array_idx + 1) % archive_lut_size
+    if cropped_img_size:
+        raw_data = np.reshape(raw_data,(archive_lut_size * len(stations), len(channels), cropped_img_size, cropped_img_size))
     return raw_data
 
 
@@ -661,7 +673,31 @@ def get_data(dataframe_path, start_date, end_date, channels = None, stations = N
     :param dataframe_path:
     :param start_date: string corresponding to the date of the first day wanted e.g. "2011-12-01"
     :param end_date: string corresponding to the date of the first day unwanted i.e. end_date is not included e.g. "2011-12-03"
-    :return: dataframe containing the informations of all timestamps between those dates and the cropped images corresponding to them
+    :return: dataframe, imgs
+     where
+     dataframe: contains the informations of all timestamps between those dates. one row per combination of timestamps and station
+     imgs: np.array of cropped images
+     shape=(number of days * 96 * number of stations, nb of channels,cropped_img_size, cropped_img_size)
+
+    Corresponding index between dataframe and imgs
+
+    With n = i*len(stations)+station_index
+    dataframe.iloc[n] contains the metadata of imgs[n]
+    where
+    station_index: is the index of the station in the dictionnary 'stations'
+    i: is the ith timestamps from start_date at 08:00:00
+    Useful if you want to iterate on every timestamps of one station and the data fetched contains multiple
+
+    With n = df.index.get_loc((an_iso_datetime)),
+    dataframe.iloc[n] returns a dataframe shape (nb_stations, nb_columns) containing the
+    metadata for each stations at the specified datetime
+    imgs[n] return the corresponding images
+
+    With n = df.index.get_loc((an_iso_datetime,station_index))
+    dataframe.iloc[n] returns a series with the metadata of the specified
+    station at the specified datetime
+    imgs[n] returns the corresponding images
+
     """
     if channels is None:
         channels = ["ch1", "ch2", "ch3", "ch4", "ch6"]
@@ -678,7 +714,7 @@ def get_data(dataframe_path, start_date, end_date, channels = None, stations = N
 
     start_date, end_date = start_date+" 08:00:00", end_date+" 08:00:00"
 
-    #get dataframe
+    # select timeframe
     dataframe = pd.read_pickle(dataframe_path)
     dataframe = dataframe[dataframe.index >= datetime.datetime.fromisoformat(start_date)]
     dataframe = dataframe[dataframe.index < datetime.datetime.fromisoformat(end_date)]
@@ -700,7 +736,52 @@ def get_data(dataframe_path, start_date, end_date, channels = None, stations = N
         hdf5_path = dataframe['hdf5_8bit_path'].iloc[dataframe.index.get_loc(day)]
         day_img = fetch_and_crop_hdf5_imagery(hdf5_path, channels, stations, dataframe_path,cropped_img_size=cropped_img_size)
         imgs = np.vstack((imgs,day_img))
+
+    ## format dataframe to correspond to imgs
+
+    # keep those columns intact
+    dataframe = dataframe.set_index(['ncdf_path', 'hdf5_8bit_path', 'hdf5_8bit_offset', 'hdf5_16bit_path', 'hdf5_16bit_offset'],
+                      append=True)
+
+    # remove columns with about station not in the dictionary
+    stations_name = tuple(stations.keys())
+    dataframe = dataframe.loc[:, dataframe.columns.str.startswith(stations_name)]
+
+    # create column for station name and change other columns to not be station specific
+    # (e.g. replace columns 'BND_GHI', TBL_GHI','DRA_GHI', etc by columns STATION_NAME and GHI)
+    # each rows contain information about only one station
+    dataframe.columns = dataframe.columns.str.split('_', 1, expand=True)
+    dataframe = dataframe.stack(0).reset_index().rename(columns={'level_6': 'STATION_NAME'}).set_index(['iso-datetime'])
+
+    # add column station index and add it as index (with the datetime)
+    dataframe['STATION_INDEX'] = dataframe.apply(lambda row: stations_name.index(row['STATION_NAME']), axis=1)
+    dataframe = dataframe.set_index(['STATION_INDEX'],append=True)
+
+    # sort dataframe so that the index correspond between the dataframe and the images np.array
+
+    dataframe.sort_index( inplace=True)
     return dataframe, imgs
+
+def get_sample(processed_dataframe, cropped_imgs, iso_datetime, station_idx = None):
+    """
+    :param processed_dataframe: dataframe processed by get_data
+    :param cropped_imgs: cropped imgs from get_data
+    :param iso_datetime: e.g. datetime.datetime.fromisoformat("2011-12-01 08:00:00")
+    :param station_idx: optional, index of the station according to the dictionary 'stations' given to get_data. Useful
+                        if the processed data contains more than one station and want to filter out the other ones.
+    :return: subsection of dataframe and imgs according to the datetime and station wanted
+    If the station_idx is specified, it returns a series of shape (number of columns, ) and a np.array of shape
+    (number of channels, image height, image width).
+    If station_idx is not specified, it returns a dataframe of shape (number of stations, number of columns) and a np.array of
+    shape (number of stations, number of channels, image height, image width).
+
+    Easily select sample at a specific datetime (and optionally specific station) inside the preprocessed data.
+    """
+    if station_idx is not None:
+        n = df.index.get_loc((iso_datetime, station_idx))
+    else:
+        n = df.index.get_loc((iso_datetime))
+    return processed_dataframe.iloc[n], cropped_imgs[n]
 
 
 if __name__ == "__main__":
@@ -709,5 +790,11 @@ if __name__ == "__main__":
     # print(img_data.shape)
 
     df, imgs = get_data("../data/catalog.helios.public.20100101-20160101_updated.pkl", "2011-12-01", "2011-12-04")
-    print(df.shape, imgs.shape)
+    print('Dataframe', df.shape, 'Images',imgs.shape)
+
+    a_datetime = datetime.datetime.fromisoformat("2011-12-03 13:45:00")
+    metadata, cropped_image = get_sample(df, imgs, a_datetime, 4)
+    print('Specific metadata', metadata.shape,'Specific image', cropped_image.shape)
+    print(metadata)
+    print(cropped_image)
 
