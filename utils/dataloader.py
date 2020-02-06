@@ -45,19 +45,22 @@ def data_generator_hdf5(
         yield samples, targets
 
 
+
 def load_training(
-        hdf5_path: str,
+        data_dir: str,
         channels: typing.List[str],
         dataframe_path: typing.Optional[str] = None,
         stations: typing.Optional[typing.Dict[str, typing.Tuple]] = None,
         copy_last_if_missing: bool = True,
 ) -> None:
     """Displays a looping visualization of the imagery channels saved in an HDF5 file.
-
-    This visualization requires OpenCV3+ ('cv2'), and will loop while refreshing a local window until the program
-    is killed, or 'q' is pressed. The visualization can also be paused by pressing the space bar.
+        Generate data from dataframe and h5 file.
     """
-    assert os.path.isfile(hdf5_path), f"invalid hdf5 path: {hdf5_path}"
+
+    # the final dimession is [batch, station, image_x, image_y, image_channels]
+    # the final dimentsion of [batch, station, ghi_reading]
+
+    assert os.path.exists(data_dir), f"invalid hdf5 path: {data_dir}"
     assert channels, "list of channels must not be empty"
 
     with h5py.File(hdf5_path, "r") as h5_data:
@@ -128,29 +131,35 @@ def load_training(
             sample_step=datetime.timedelta(minutes=15),
             plot_title=global_start_time.strftime("GHI @ %Y-%m-%d"),
         )
-        assert plot_data.shape[0] == archive_lut_size
-    display_data = []
-    for array_idx in tqdm.tqdm(range(archive_lut_size), desc="reshaping for final display"):
-        display = cv.vconcat([raw_data[array_idx, ch_idx, ...]
-                              for ch_idx in range(len(channels))])
-        while any([s > 1200 for s in display.shape]):
-            display = cv.resize(display, (-1, -1), fx=0.75, fy=0.75)
-        if plot_data is not None:
-            plot = plot_data[array_idx]
-            plot_scale = display.shape[0] / plot.shape[0]
-            plot = cv.resize(plot, (-1, -1), fx=plot_scale, fy=plot_scale)
-            display = cv.hconcat([display, plot])
-        display_data.append(display)
-    display = np.stack(display_data)
-    array_idx, window_name = 0, hdf5_path.split("/")[-1]
 
-    data_loader = tf.data.Dataset.from_generator(
-        dummy_data_generator, (tf.float32, tf.float32)
-    )
+        ################################### MODIFY ABOVE ##################################
 
-    ################################### MODIFY ABOVE ##################################
+        return data_loader
 
-    return data_loader
+def prepare_for_training(ds, cache=True, shuffle_buffer_size=1000):
+    # This is a small dataset, only load it once, and keep it in memory.
+    # use `.cache(filename)` to cache preprocessing work for datasets that don't
+    # fit in memory.
+    if cache:
+    if isinstance(cache, str):
+        ds = ds.cache(cache)
+    else:
+        ds = ds.cache()
+
+    # ds = ds.shuffle(buffer_size=shuffle_buffer_size)
+
+    # Repeat forever
+    ds = ds.repeat()
+
+    ds = ds.batch(BATCH_SIZE)
+
+    # `prefetch` lets the dataset fetch batches in the background while the model
+    # is training.
+    ds = ds.prefetch(buffer_size=AUTOTUNE)
+
+    return ds
+
+
 
 
 if __name__ == "__main__":
@@ -174,53 +183,18 @@ if __name__ == "__main__":
         "PSU": [40.72012, -77.93085, 376],
         "SXF": [43.73403, -96.62328, 473]
     }
-    # load_training(hdf5_path, target_channels, dataframe_path, stations)
-
-    df = pd.read_pickle(dataframe_path) if dataframe_path else None
-    # print(df.head(10))
-
-    # Image generator
-    import pathlib
 
     data_dir = '/home/ryan/data/'
-    data_dir = pathlib.Path(data_dir)
+    load_training(data_dir, target_channels, dataframe_path, stations)
+"""
+            T_0 = lut_timestamps
+            T_1 = T_0 + datetime.timedelta(hours=1)
+            T_3 = T_0 + datetime.timedelta(hours=3)
+            T_6 = T_0 + datetime.timedelta(hours=6)
+            lut_timestamps = [T_0, T_1, T_3, T_6]
 
-    h5_count = len(list(data_dir.glob('*.h5')))
-    print("file count is:", h5_count)
+            stattion_data["ghi"] = [
+                df.at[pd.Timestamp(t), reg + "_GHI"] for t in lut_timestamps]
 
-    batch_size = 32
-    image_dim = (64, 64)
-    n_channels = 5
-    output_seq_len = 4
-
-    idx, lats, lons = 0, None, None
-
-    for idx, hdf5_path in enumerate(list(data_dir.glob('*.h5'))):
-        print(hdf5_path)
-        with h5py.File(hdf5_path, "r") as h5_data:
-            # test data
-            # for hdf5_offset in range(95):
-            #     ch1_data = utils.fetch_hdf5_sample("ch1", h5_data, hdf5_offset)
-            #     if ch1_data is not None:
-            #         print(ch1_data.shape)
-
-            global_start_idx = h5_data.attrs["global_dataframe_start_idx"]
-            global_end_idx = h5_data.attrs["global_dataframe_end_idx"]
-            archive_lut_size = global_end_idx - global_start_idx
-            global_start_time = datetime.datetime.strptime(
-                h5_data.attrs["global_dataframe_start_time"], "%Y.%m.%d.%H%M")
-            lut_timestamps = [global_start_time + idx *
-                              datetime.timedelta(minutes=15) for idx in range(archive_lut_size)]
-
-            # parse station data
-            station_data = {}
-
-            if stations:
-                df = pd.read_pickle(dataframe_path) if dataframe_path else None
-                while (lats is None or lons is None) and idx < archive_lut_size:
-                    lats, lons = utils.fetch_hdf5_sample(
-                        "lat", h5_data, idx), utils.fetch_hdf5_sample("lon", h5_data, idx)
-                assert lats is not None and lons is not None, "Could not fetch lats/lons arrays (hdf5 might be empty)"
-                for reg, coords in tqdm.tqdm(stations.items, desc="preparing stations data"):
-                    station_coords = np.argmin(
-                        np.abs(lats - coords[0])), np.argmin(np.abs(lons - coords[1]))
+            target = stattion_data["ghi"]
+            yield sample, target_reading

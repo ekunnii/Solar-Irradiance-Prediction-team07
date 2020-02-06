@@ -4,6 +4,8 @@ import math
 import os
 import typing
 import warnings
+import copy
+
 
 import cv2 as cv
 import h5py
@@ -38,7 +40,6 @@ def get_label_html_color_code(idx):
 
 def fig2array(fig):
     """Transforms a pyplot figure into a numpy-compatible BGR array.
-
     The reason why we flip the channel order (RGB->BGR) is for OpenCV compatibility. Feel free to
     edit this function if you wish to use it with another display library.
     """
@@ -54,7 +55,6 @@ def compress_array(
         compr_type: typing.Optional[str] = "auto",
 ) -> bytes:
     """Compresses the provided numpy array according to a predetermined strategy.
-
     If ``compr_type`` is 'auto', the best strategy will be automatically selected based on the input
     array type. If ``compr_type`` is an empty string (or ``None``), no compression will be applied.
     """
@@ -105,10 +105,8 @@ def decompress_array(
         shape: typing.Optional[typing.Union[typing.List, typing.Tuple]] = None,
 ) -> np.ndarray:
     """Decompresses the provided numpy array according to a predetermined strategy.
-
     If ``compr_type`` is 'auto', the correct strategy will be automatically selected based on the array's
     bytecode prefix. If ``compr_type`` is an empty string (or ``None``), no decompression will be applied.
-
     This function can optionally convert and reshape the decompressed array, if needed.
     """
     compr_types = ["lz4", "float16+lz4", "uint8+jpg", "uint8+jp2", "uint16+jp2"]
@@ -149,13 +147,11 @@ def fetch_hdf5_sample(
         sample_idx: int,
 ) -> typing.Any:
     """Decodes and returns a single sample from an HDF5 dataset.
-
     Args:
         dataset_name: name of the HDF5 dataset to fetch the sample from using the reader. In the context of
             the GHI prediction project, this may be for example an imagery channel name (e.g. "ch1").
         reader: an HDF5 archive reader obtained via ``h5py.File(...)`` which can be used for dataset indexing.
         sample_idx: the integer index (or offset) that corresponds to the position of the sample in the dataset.
-
     Returns:
         The sample. This function will automatically decompress the sample if it was compressed. It the sample is
         unavailable because the input was originally masked, the function will return ``None``. The sample itself
@@ -200,7 +196,6 @@ def viz_hdf5_imagery(
         copy_last_if_missing: bool = True,
 ) -> None:
     """Displays a looping visualization of the imagery channels saved in an HDF5 file.
-
     This visualization requires OpenCV3+ ('cv2'), and will loop while refreshing a local window until the program
     is killed, or 'q' is pressed. The visualization can also be paused by pressing the space bar.
     """
@@ -294,7 +289,6 @@ def preplot_live_ghi_curves(
         plot_title: typing.Optional[typing.AnyStr] = None,
 ) -> np.ndarray:
     """Pre-plots a set of GHI curves with update bars and returns the raw pixel arrays.
-
     This function is used in ``viz_hdf5_imagery`` to prepare GHI plots when stations & dataframe information
     is available.
     """
@@ -359,7 +353,6 @@ def plot_ghi_curves(
         current_time: typing.Optional[datetime.datetime] = None,
 ) -> plt.Axes:
     """Plots a set of GHI curves and returns the associated matplotlib axes object.
-
     This function is used in ``draw_daily_ghi`` and ``preplot_live_ghi_curves`` to create simple
     graphs of GHI curves (clearsky, measured, predicted).
     """
@@ -403,7 +396,6 @@ def draw_daily_ghi(
         sample_step: datetime.timedelta,
 ):
     """Draws a set of 2D GHI curve plots and returns the associated matplotlib fig/axes objects.
-
     This function is used in ``viz_predictions`` to prepare the full-horizon, multi-station graphs of
     GHI values over numerous days.
     """
@@ -448,7 +440,6 @@ def viz_predictions(
         test_config_path: typing.AnyStr,
 ):
     """Displays a looping visualization of the GHI predictions saved by the evaluation script.
-
     This visualization requires OpenCV3+ ('cv2'), and will loop while refreshing a local window until the program
     is killed, or 'q' is pressed. The arrow keys allow the user to change which day is being shown.
     """
@@ -525,3 +516,272 @@ def viz_predictions(
             day_idx = max(day_idx - 1, 0)
         elif ret == 82 or ret == 83:  # UNIX: right or up arrow
             day_idx = min(day_idx + 1, len(displays) - 1)
+
+
+def fetch_and_crop_hdf5_imagery(
+        hdf5_path: str,
+        channels: typing.List[str],
+        stations: typing.Optional[typing.Dict[str, typing.Tuple]],
+        dataframe_path: typing.Optional[str] = None,
+        cropped_img_size: typing.Optional[int] = None,
+        copy_last_if_missing: bool = True,
+        visualize: bool = False,
+) -> np.ndarray:
+    """
+    :param hdf5_path:
+    :param channels: list of strings of the channels of interest e.g. ["ch1", "ch2", "ch3", "ch4", "ch6"]
+    :param stations: dict containing for each station of interest its coordinate
+    :param dataframe_path:
+    :param copy_last_if_missing:
+    :param cropped_img_size: size of the returned images
+    :return: numpy array of shape (96, number of stations, cropped_img_size, cropped_img_size) where 96 is the number of timestamps in a day
+    Fetch images of a day and crop them
+    """
+    assert os.path.isfile(hdf5_path), f"invalid hdf5 path: {hdf5_path}"
+    assert channels, "list of channels must not be empty"
+    with h5py.File(hdf5_path, "r") as h5_data:
+        global_start_idx = h5_data.attrs["global_dataframe_start_idx"]
+        global_end_idx = h5_data.attrs["global_dataframe_end_idx"]
+        archive_lut_size = global_end_idx - global_start_idx
+        global_start_time = datetime.datetime.strptime(h5_data.attrs["global_dataframe_start_time"], "%Y.%m.%d.%H%M")
+        lut_timestamps = [global_start_time + idx * datetime.timedelta(minutes=15) for idx in range(archive_lut_size)]
+        stations_data = {}
+        if stations:
+            df = pd.read_pickle(dataframe_path) if dataframe_path else None
+            df = df.fillna(0)
+            df = df.replace(['nan'], [0])
+            # assume lats/lons stay identical throughout all frames; just pick the first available arrays
+            idx, lats, lons = 0, None, None
+            while (lats is None or lons is None) and idx < archive_lut_size:
+                lats, lons = fetch_hdf5_sample("lat", h5_data, idx), fetch_hdf5_sample("lon", h5_data, idx)
+            assert lats is not None and lons is not None, "could not fetch lats/lons arrays (hdf5 might be empty)"
+            #for reg, coords in tqdm.tqdm(stations.items(), desc="preparing stations data"):
+            for reg, coords in stations.items():
+                station_coords = (np.argmin(np.abs(lats - coords[0])), np.argmin(np.abs(lons - coords[1])))
+                station_data = {"coords": station_coords}
+                if dataframe_path:
+                    station_data["ghi"] = [df.at[pd.Timestamp(t), reg + "_GHI"] for t in lut_timestamps]
+                    station_data["csky"] = [df.at[pd.Timestamp(t), reg + "_CLEARSKY_GHI"] for t in lut_timestamps]
+                stations_data[reg] = station_data
+
+        if cropped_img_size:
+            # different image for each station because cropped image around stations coordinate
+            raw_data = np.zeros((archive_lut_size, len(stations), len(channels), cropped_img_size, cropped_img_size), dtype=np.uint8)
+        else:
+            # nb of timeframe selected, nb of channel (5), height img, length img, each image has 3 channels (RGB)
+            # raw_data = np.zeros((archive_lut_size, len(channels), 650, 1500, 3), dtype=np.uint8)
+            raw_data = np.zeros((archive_lut_size, len(channels), 650, 1500), dtype=np.uint8)
+        for channel_idx, channel_name in tqdm.tqdm(enumerate(channels), desc="preparing img data", total=len(channels)):
+            assert channel_name in h5_data, f"missing channel: {channels}"
+            norm_min = h5_data[channel_name].attrs.get("orig_min", None)
+            norm_max = h5_data[channel_name].attrs.get("orig_max", None)
+            channel_data = [fetch_hdf5_sample(channel_name, h5_data, idx) for idx in range(archive_lut_size)]  
+            assert all([array is None or array.shape == (650, 1500) for array in channel_data]), \
+                "one of the saved channels had an expected dimension"
+            last_valid_array_idx = None
+            for array_idx, array in enumerate(channel_data):
+                if array is None:
+                    if copy_last_if_missing and last_valid_array_idx is not None:
+                        if cropped_img_size:
+                            for station_idx, (station_name, station) in enumerate(stations_data.items()):
+                                raw_data[array_idx, station_idx, channel_idx, :, :] = raw_data[last_valid_array_idx, station_idx, channel_idx, :, :]
+                        else:
+                            raw_data[array_idx, channel_idx, :, :] = raw_data[last_valid_array_idx, channel_idx, :, :]
+                    continue
+                array = (((array.astype(np.float32) - norm_min) / (norm_max - norm_min)) * 255).astype(np.uint8)
+                # transform into RGB and add 3 channels per image
+                #array = cv.applyColorMap(array, cv.COLORMAP_BONE)
+                for station_idx, (station_name, station) in enumerate(stations_data.items()):
+                    # station_color = utils.get_label_color_mapping(station_idx + 1).tolist()[::-1]
+                    # shades = [(128,128,128), (255, 0, 0), (192,192,192), (112,128,144), (47,79,79), (220,220,220), (105,105,105)]
+                    # array = cv.circle(array, station["coords"][::-1], radius=3, color=shades[station_idx], thickness=-1)
+                    if cropped_img_size:
+                        array_cropped = crop(copy.deepcopy(array), station["coords"], cropped_img_size)
+                        raw_data[array_idx, station_idx, channel_idx, ...] = cv.flip(array_cropped, 0)
+                if cropped_img_size is None:
+                    raw_data[array_idx, channel_idx, :, :] = cv.flip(array, 0)
+                last_valid_array_idx = array_idx
+    if visualize:
+        display_data = []
+        for array_idx in tqdm.tqdm(range(archive_lut_size), desc="reshaping for final display"):
+            display_data2 = []
+            for st_idx in range(len(stations)):
+                display = cv.hconcat([raw_data[array_idx, st_idx, ch_idx, ...] for ch_idx in range(len(channels))])
+                display_data2.append(display)
+            display = np.stack(display_data2)
+            display = cv.vconcat([display[st_idx, ...] for st_idx in range(len(stations))])
+            display_data.append(display)
+        display = np.stack(display_data)
+        array_idx, window_name, paused = 0, hdf5_path.split("/")[-1], False
+        while True:
+            cv.imshow(window_name, display[array_idx,:,:])
+            ret = cv.waitKey(30 if not paused else 300)
+            if ret == ord('q') or ret == 27:  # q or ESC
+                break
+            elif ret == ord(' '):
+                paused = ~paused
+            if not paused or ret == ord('c'):
+                array_idx = (array_idx + 1) % archive_lut_size
+    return raw_data, stations_data
+
+
+def crop(array, center, cropped_img_size):
+    """
+    :param array: 2d numpy array
+    :param center: coordinate of the center of where the image should be cropped
+    :param cropped_img_size: size of the resulting image (resulting image is always a square)
+    :return: 2d numpy array corresponding to the cropped image
+    """
+
+    crop_size = cropped_img_size - 1 # the center is excluded to compute the corners
+    #get coordinate of the corners of the resulting image if crop around the center given
+    corner_coord = [center[0] - math.ceil(crop_size / 2), 1 + center[0] + math.floor(crop_size / 2),
+                    center[1] - math.ceil(crop_size / 2), 1 + center[1] + math.floor(crop_size / 2)]
+
+    # while keeping the correct crop size, move corners so they are not outside of the image.
+    # 'center' will not be at the middle of the image if the crop was going outside of the image border.
+    for i in reversed(range(len(corner_coord))):
+        # move corners that are below 0 and shift the corresponding corner to keep the correct cropped size
+        corner_coord[i] -= min(0, corner_coord[(i//2)*2])
+    for i in range(len(corner_coord)):
+        # move corners that are above the border and shift the corresponding corner to keep the correct cropped size
+        corner_coord[i] -= max(0, corner_coord[((i//2)*2)+1] - array.shape[i//2])
+
+    assert (0 < array).any(), f"Cropping failed. Array {array.shape}, Crop size {crop_size}, Center {center}, Corners of tentatively cropped image {corner_coord}"
+
+    return array[corner_coord[0]:corner_coord[1], corner_coord[2]:corner_coord[3]]
+
+
+def get_data(dataframe_path, start_date, end_date, channels = None, stations = None, cropped_img_size = 64, batch_size = 32):
+    """
+    :param dataframe_path:
+    :param start_date: string corresponding to the date of the first day wanted e.g. "2011-12-01"
+    :param end_date: string corresponding to the date of the first day unwanted i.e. end_date is not included e.g. "2011-12-03"
+    :return: image_data[32, 64, 64, 5], target_labels[32, 4], meta_data(clear_sky)[32, 4]
+    """
+    if channels is None:
+        channels = ["ch1", "ch2", "ch3", "ch4", "ch6"]
+    if stations is None:
+        stations = {
+            "BND": [40.05192, -88.37309, 230],
+            "TBL": [40.12498, -105.23680, 1689],
+            "DRA": [36.62373, -116.01947, 1007],
+            "FPK": [48.30783, -105.10170, 634],
+            "GWN": [34.25470, -89.87290, 98],
+            "PSU": [40.72012, -77.93085, 376],
+            "SXF": [43.73403, -96.62328, 473]
+        }
+    start_date, end_date = start_date +" 08:00:00", end_date +" 08:00:00"
+    data = []
+
+    #get dataframe
+    dataframe = pd.read_pickle(dataframe_path)
+    dataframe = dataframe[dataframe.index >= datetime.datetime.fromisoformat(start_date)]
+    dataframe = dataframe[dataframe.index < datetime.datetime.fromisoformat(end_date)]
+
+    wanted_days = []
+    jump_day = pd.Timedelta("P1DT0H0M0S", ).to_pytimedelta()
+    start = datetime.datetime.fromisoformat(start_date)
+    end = datetime.datetime.fromisoformat(end_date)
+    i = 0
+    while start + i * jump_day < end:
+        new_datetime = start + i * jump_day
+        if new_datetime in dataframe.index:
+            wanted_days.append(new_datetime)
+        i += 1
+
+    hdf5_path = dataframe['hdf5_8bit_path'].iloc[dataframe.index.get_loc(wanted_days[0])]
+    hdf5_path = "/home/ryan/data/8bit-2014.01.01.0800.h5"
+    imgs, stations_data = fetch_and_crop_hdf5_imagery(hdf5_path, channels, stations, dataframe_path,cropped_img_size=cropped_img_size) 
+    data.append((imgs, stations_data))
+    
+    for day in wanted_days[1:]:
+        hdf5_path = dataframe['hdf5_8bit_path'].iloc[dataframe.index.get_loc(day)]
+        hdf5_path = "/home/ryan/data/8bit-2014.01.01.0800.h5"
+        imgs, stations_data = fetch_and_crop_hdf5_imagery(hdf5_path, channels, stations, dataframe_path,cropped_img_size=cropped_img_size)
+        data.append((imgs, stations_data))
+    
+    return data
+
+
+def image_data_generator(data, batch_size=32):
+
+    for idx, (imgs, stations_data) in enumerate(data):
+        imgs = imgs.reshape(-1, 64,64,5)    
+        target_list = []
+        for station_name, station_reading in stations_data.items():
+            ghi_reading = station_reading['ghi'] + batch_size * [0]
+            for idx in range(0, len(ghi_reading)-batch_size):
+                target_list.append(ghi_reading[idx:idx+4])
+        target_list = np.vstack(target_list)
+
+        for img_idx in range(0, imgs.shape[0], batch_size):
+            yield imgs[img_idx:img_idx+batch_size].astype(np.float32), target_list[img_idx:img_idx+batch_size].astype(np.float32)
+
+def dummy_data_generator(data, batch_size=32):
+        """
+        Generate dummy data for the model, only for example purposes.
+        """
+        batch_size = 32
+        image_dim = (64, 64)
+        n_channels = 5
+        output_seq_len = 4
+
+        for i in range(0, len(target_datetimes), batch_size):
+            batch_of_datetimes = target_datetimes[i:i+batch_size]
+            # This is evaluator, so there is timestamp for test time.
+            # Which training, do we need to specify the datetimes? or we can get all data?
+
+            samples = tf.random.uniform(shape=(
+                len(batch_of_datetimes), image_dim[0], image_dim[1], n_channels
+            ))
+            targets = tf.zeros(shape=(
+                len(batch_of_datetimes), output_seq_len
+            ))
+            # Remember that you do not have access to the targets.
+            # Your dataloader should handle this accordingly.
+            yield samples, targets
+
+if __name__ == "__main__":
+    # Show cropped images for a day
+    # img_data = fetch_and_crop_hdf5_imagery(hdf5_path, target_channels, stations, dataframe_path, cropped_img_size=cropped_img_size, visualize=True)
+    # print(img_data.shape)
+
+    data = get_data("/home/ryan/data/catalog.helios.public.20100101-20160101.pkl", "2011-12-01", "2011-12-02")
+    data_loader = tf.data.Dataset.from_generator(dummy_data_generator, args=[data, 32], output_types=(tf.float32, tf.float32))
+    # while 1:
+    #     images, labels = next(image_data_generator(data, 32))
+    #     print(type(images), images.shape, type(labels), labels.shape)
+    #     import time
+    #     time.sleep(1)
+
+    # data_loader = tf.data.Dataset.from_generator(data_generator, args=["/home/ryan/data/catalog.helios.public.20100101-20160101.pkl", "2011-12-01", "2011-12-02"], output_types=(tf.float32, tf.float32), output_shapes=([32,64,64,5], [32,4]))
+    
+    data_loader = tf.data.Dataset.from_generator(image_data_generator, args=[data,32], output_types=(tf.float32, tf.float32))
+
+    train_images, train_labels = next(iter(data_loader))
+
+    print(train_images.numpy().shape)
+    print(train_labels.numpy().shape)
+
+"""
+    model = models.Sequential()
+    model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(64, 64, 5)))
+    model.add(layers.MaxPooling2D((2, 2)))
+    model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+    model.add(layers.MaxPooling2D((2, 2)))
+    model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+
+    model.add(layers.Flatten())
+    model.add(layers.Dense(64, activation='relu'))
+    model.add(layers.Dense(10, activation='softmax'))
+
+    model.summary()
+
+    model.compile(optimizer='adam',
+              loss='sparse_categorical_crossentropy',
+              metrics=['accuracy'])
+
+    history = model.fit(train_images, train_labels, epochs=10, 
+                        validation_data=(test_images, test_labels)) 
+    """
