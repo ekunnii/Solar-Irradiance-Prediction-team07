@@ -6,6 +6,7 @@ import typing
 import json
 import os
 import tensorflow as tf
+import pdb
 
 from models.model_factory import ModelFactory
 from dataloader.dataset import TrainingDataSet
@@ -74,8 +75,8 @@ if __name__ == "__main__":
     dataset = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
         .prefetch(tf.data.experimental.AUTOTUNE) \
         .batch(batch_size) \
-        .cache(cache_dir + "/tf_learn_cache") \
-        .shuffle(buffer_size)
+   #     .cache(cache_dir + "/tf_learn_cache") \
+    #    .shuffle(buffer_size)
     
     train_loss_results = []
     train_accuracy_results = []
