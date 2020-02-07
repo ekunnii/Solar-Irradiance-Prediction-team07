@@ -39,9 +39,8 @@ def get_image_transformed(h5_data: h5py.File, channels, image_time_offset_idx: i
     # TODO Normalize images?
     all_channels = np.empty([cropped_img_size, cropped_img_size, len(channels)])
     for ch_idx, channel in enumerate(channels):
-        raw_img = []
         raw_img = utils.fetch_hdf5_sample(channel, h5_data, image_time_offset_idx)
-        if len(raw_img) == 0: 
+        if raw_img is None or raw_img.shape != (650, 1500): 
             return None
         
         array_cropped = utils.crop(copy.deepcopy(raw_img), station_pixel_coords, cropped_img_size)
@@ -53,9 +52,6 @@ def get_image_transformed(h5_data: h5py.File, channels, image_time_offset_idx: i
     
     return all_channels
 
-
-# Variable used to debug locally
-local = True
 
 # This is used both in the evaluation and for testing
 def BuildDataSet(
@@ -90,9 +86,9 @@ def BuildDataSet(
                     image_time_offset_idx = (date_index - global_start_time) / datetime.timedelta(minutes=15)
 
                     lats, lons = get_lats_lon(h5_data, h5_size)
-                    print(lats, lons)
+                    #print(lats, lons)
                     #fetch_hdf5_sample = utils.fetch_hdf5_sample()
-
+                    #pdb.set_trace()
                     # Return one station at a time
                     for station_idx, coords in stations.items():
                         # get station specefic data / meta we want
@@ -103,9 +99,11 @@ def BuildDataSet(
 
                         # Get image data
                         image_data = get_image_transformed(h5_data, channels, image_time_offset_idx, station_pixel_coords, image_dim[0])
+                        if image_data is None:
+                            continue
 
                         # get station GHI targets
-                        station_ghis = [None] * 5
+                        station_ghis = np.zeros([4])
                         station_ghis[0] = row[station_idx + "_GHI"] # Time 0 TODO
                         
                         yield (meta_array, image_data, station_ghis)
