@@ -7,6 +7,7 @@ import json
 import os
 import tensorflow as tf
 import pdb
+import time
 
 from models.model_factory import ModelFactory
 from dataloader.dataset import TrainingDataSet
@@ -51,6 +52,8 @@ if __name__ == "__main__":
                         help="Enable training or not")
     args = parser.parse_args()
     
+    print("Start Training!!")
+
     # Load configs
     assert os.path.isfile(args.train_config), f"Invalid training configuration file: {args.train_config}"
     with open(args.train_config, "r") as tc:
@@ -83,9 +86,10 @@ if __name__ == "__main__":
     is_training = args.training
     loss_fct = tf.keras.losses.MSE 
 
-
+    print("Model and dataset loaded, starting main training loop...!!")
     # main loop
     for epoch in range(args.num_epochs):
+        start_time = time.time()
         epoch_loss_avg = tf.keras.metrics.Mean()
 
         for metas, images, targets in dataset:
@@ -99,5 +103,8 @@ if __name__ == "__main__":
 
         # End epoch
         train_loss_results.append(epoch_loss_avg.result())
+        print(f"Epoch result: {epoch_loss_avg.result()}")
+        end_time = time.time()
+        print(f"Epoch time elapsed: {end_time - start_time}")
 
 
