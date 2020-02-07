@@ -1,3 +1,10 @@
+<<<<<<< Updated upstream
+.vscode
 .vscode
 .ipynb_checkpoints
 *.out
+solar_env
+data
+__pycache__
+.venv
+env
