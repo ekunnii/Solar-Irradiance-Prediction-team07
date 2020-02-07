@@ -1,10 +1,12 @@
-<<<<<<< Updated upstream
 .vscode
 .vscode
 .ipynb_checkpoints
 *.out
+.DS_Store
+*.h5
 solar_env
 data
 __pycache__
 .venv
 env
+
