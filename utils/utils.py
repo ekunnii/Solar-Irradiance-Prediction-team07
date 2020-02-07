@@ -825,6 +825,24 @@ def dummy_data_generator(data, batch_size=32):
             yield samples, targets
 
 
+def convert_time(timestamp):
+    """
+    Take the hour/minute and month of the timestamp and convert them to a 
+    sin/cos vector to better represent the similarity between January (1)
+    and December (12) or 23h45 and 00h00
+    This function can take a string (json file) or a timestamp object (pd dataframe)
+    """
+    try:
+        date = datetime.datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S")
+    except TypeError:
+        date = timestamp
+    min15_in_day = 24*4
+    sin_month = np.sin(2*np.pi*date.month/12)
+    cos_month = np.cos(2*np.pi*date.month/12)
+    sin_minute = np.sin(2*np.pi*(date.hour*4+date.minute/15)/min15_in_day)
+    cos_minute = np.cos(2*np.pi*(date.hour*4+date.minute/15)/min15_in_day)
+    return (sin_month,cos_month,sin_minute,cos_minute)
+
 if __name__ == "__main__":
     # Show cropped images for a day
     # img_data = fetch_and_crop_hdf5_imagery(hdf5_path, target_channels, stations, dataframe_path, cropped_img_size=cropped_img_size, visualize=True)
