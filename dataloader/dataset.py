@@ -3,12 +3,16 @@ Objectif: from data path and t0, dataloader
 """
 import tensorflow as tf
 import pandas as pd
+import numpy as np
 import time 
 import typing
 import os
-import utils
+from utils import utils
 from shutil import copyfile
 import datetime
+import pdb
+import h5py
+import copy
 
 def set_faster_path(original_file, scratch_dir):
     if scratch_dir == None or scratch_dir == "":
@@ -21,6 +25,37 @@ def set_faster_path(original_file, scratch_dir):
         copyfile(original_file, destination)
     print(f"The dataframe has been copied to: {destination}")
     return destination
+
+def get_lats_lon(h5_data: h5py.File, h5_size: int):
+    idx, lats, lons = 0, None, None
+    while (lats is None or lons is None) and idx < h5_size:
+        lats, lons = utils.fetch_hdf5_sample("lat", h5_data, idx), utils.fetch_hdf5_sample("lon", h5_data, idx)
+    assert lats is not None and lons is not None, "could not fetch lats/lons arrays (hdf5 might be empty)"
+
+    return lats, lons
+
+def get_image_transformed(h5_data: h5py.File, channels, image_time_offset_idx: int, station_pixel_coords, cropped_img_size = 64):
+    # get the right image
+    # TODO Normalize images?
+    all_channels = np.empty([cropped_img_size, cropped_img_size, len(channels)])
+    for ch_idx, channel in enumerate(channels):
+        raw_img = []
+        raw_img = utils.fetch_hdf5_sample(channel, h5_data, image_time_offset_idx)
+        if len(raw_img) == 0: 
+            return None
+        
+        array_cropped = utils.crop(copy.deepcopy(raw_img), station_pixel_coords, cropped_img_size)
+        # raw_data[array_idx, station_idx, channel_idx, ...] = cv.flip(array_cropped, 0) # TODO why the flip??
+
+        #array = (((array.astype(np.float32) - norm_min) / (norm_max - norm_min)) * 255).astype(np.uint8) # TODO norm? 
+        array_cropped = array_cropped.astype(np.uint8) # convert to image format
+        all_channels[:,:,ch_idx] = array_cropped
+    
+    return all_channels
+
+
+# Variable used to debug locally
+local = True
 
 # This is used both in the evaluation and for testing
 def BuildDataSet(
@@ -35,45 +70,51 @@ def BuildDataSet(
     batch_size = user_config and user_config["batch_size"] or 32
     image_dim = user_config and user_config["image_dim"] or (64, 64)
     output_seq_len = user_config and user_config["output_seq_len"] or 4
-    channels = user_config and user_config["target_channels"] or ["ch1", "ch2", "ch3", "ch4", "ch5"]
+    channels = user_config and user_config["target_channels"] or ["ch1", "ch2", "ch3", "ch4", "ch6"]
 
     def _train_dataset():
 
-        #images_path = dataframe.ix[time_list]['hdf5_8bit_path']
-        #fetch_and_crop_hdf5_imagery
-        # Load options for training
-        
+        #for date_index, row in dataframe.loc["2011-12-1 08:00:00":].iterrows(): # TODO debug
+        for date_index, row in dataframe.iterrows():
 
-        # Get hdf5_path
-        
-        #with h5py.File(hdf5_path, "r") as h5_data:
+            # Get image information
+            hdf5_path = row['hdf5_8bit_path']
+            if not hdf5_path == 'nan' and not hdf5_path == 'NaN' and not hdf5_path == 'NAN':
+                
+                with h5py.File(hdf5_path, "r") as h5_data:
+                    # get h5 meta info
+                    global_start_idx = h5_data.attrs["global_dataframe_start_idx"]
+                    global_end_idx = h5_data.attrs["global_dataframe_end_idx"]
+                    h5_size = global_end_idx - global_start_idx
+                    global_start_time = datetime.datetime.strptime(h5_data.attrs["global_dataframe_start_time"], "%Y.%m.%d.%H%M")
+                    image_time_offset_idx = (date_index - global_start_time) / datetime.timedelta(minutes=15)
 
-         #   for chanel in channels:
-          #      pass
-                #utils.utils.fetch_hdf5_sample(dataset_name: str,reader: h5py.File,sample_idx: int,)
+                    lats, lons = get_lats_lon(h5_data, h5_size)
+                    print(lats, lons)
+                    #fetch_hdf5_sample = utils.fetch_hdf5_sample()
 
-        """
-        Ryan's code goes here!! or we call his function
-        """
-        # Opening the file
-        time.sleep(0.03)
-        print(channels)
-        
-        for sample_idx in range(3):
-            # Reading data (line, record) from the file
-            time.sleep(0.015)
-            
-            random_meta = tf.random.uniform(shape=[batch_size, 1])
-            random_image = tf.random.uniform(shape=[batch_size, 64,64,5])
-            random_target = tf.random.uniform(shape=[batch_size, 4])
-            yield (random_meta, random_image, random_target)
+                    # Return one station at a time
+                    for station_idx, coords in stations.items():
+                        # get station specefic data / meta we want
+                        station_pixel_coords = (np.argmin(np.abs(lats - coords[0])), np.argmin(np.abs(lons - coords[1])))
 
-    
-    
+                        # get meta info
+                        meta_array = np.array(station_pixel_coords) # TODO add more
+
+                        # Get image data
+                        image_data = get_image_transformed(h5_data, channels, image_time_offset_idx, station_pixel_coords, image_dim[0])
+
+                        # get station GHI targets
+                        station_ghis = [None] * 5
+                        station_ghis[0] = row[station_idx + "_GHI"] # Time 0 TODO
+                        
+                        yield (meta_array, image_data, station_ghis)
+    # End of generator
+
     image_shape = (image_dim[0], image_dim[1], len(channels))
     data_loader = tf.data.Dataset.from_generator(
         _train_dataset, 
-        output_types=(tf.float64, tf.int64, tf.float64),
+        output_types=(tf.float64, tf.int8, tf.float64),
     )
 
     return data_loader
@@ -86,15 +127,12 @@ class TrainingDataSet(tf.data.Dataset):
         stations: typing.Dict[typing.AnyStr, typing.Tuple], 
         admin_config: typing.Dict[typing.AnyStr, typing.Any], # JSON; Training config file, looks like the admin config for the evaluation
         user_config: typing.Dict[typing.AnyStr, typing.Any] = None, # JSON; Model options or data loader options
-        target_channels: typing.List[typing.AnyStr] = None,
         copy_last_if_missing: bool = True,
         train: bool = True,
         scratch_dir: str = None,
     ):
 
         fast_data_frame_path = set_faster_path(data_frame_path, scratch_dir)
-        if target_channels == None:
-            target_channels = ["ch1", "ch2", "ch3", "ch4", "ch5"]
 
         data_frame = pd.read_pickle(fast_data_frame_path)
 

@@ -45,7 +45,7 @@ if __name__ == "__main__":
     parser.add_argument("-u", "--user_config", type=str, default="",
                         help="Path to the JSON config file used to store user model/dataloader parameters")
     parser.add_argument("-s", "--scratch_dir", type=str, default=None,
-                        help="Important for performance on the cluster!! If you want the files to be read fast, please set this variable.")       
+                        help="Important for performance on the cluster!! If you want the files to be read fast, please set this variable.")   
     parser.add_argument("--training", type=bool, default=True,
                         help="Enable training or not")
     args = parser.parse_args()
@@ -60,6 +60,10 @@ if __name__ == "__main__":
         with open(args.user_config, "r") as uc:
             user_config_json = json.load(uc)
 
+
+    cache_dir = args.scratch_dir or os.getcwd()
+    batch_size = train_json.get("batch_size") or 32
+    buffer_size = train_json.get("buffer_size") or 1000
     data_frame_path = extract_data_frame_path(train_json)
     stations, target_time_offsets = extract_station_offsets(train_json)
 
@@ -68,7 +72,10 @@ if __name__ == "__main__":
     model = model_factory.build(args.model_name)
 
     dataset = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
-        .prefetch(tf.data.experimental.AUTOTUNE) 
+        .prefetch(tf.data.experimental.AUTOTUNE) \
+        .batch(batch_size) \
+        .cache(cache_dir + "/tf_learn_cache") \
+        .shuffle(buffer_size)
     
     train_loss_results = []
     train_accuracy_results = []
