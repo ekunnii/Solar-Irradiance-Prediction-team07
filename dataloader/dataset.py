@@ -20,7 +20,7 @@ def set_faster_path(original_file, scratch_dir):
         return original_file
     
     split = os.path.split(original_file)
-    destination = scratch_dir + "/data/" + split[-1]
+    destination = scratch_dir + "/" + split[-1]
     if not os.path.exists(destination):
         copyfile(original_file, destination)
     print(f"The dataframe has been copied to: {destination}")
