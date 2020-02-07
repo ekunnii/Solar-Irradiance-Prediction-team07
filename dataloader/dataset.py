@@ -102,9 +102,9 @@ def BuildDataSet(
                         # get meta info
                         lat, lont, alt = stations[station_idx] #lat, lont, alt
                         sin_month,cos_month,sin_minute,cos_minute = utils.convert_time(row.name) #encoding months and hour/minutes
-                        daytime_flag, clearsky, _, ghi = row.loc[row.index.str.startswith(station_idx)]
+                        daytime_flag, clearsky, _, __ = row.loc[row.index.str.startswith(station_idx)]
                         meta_array = np.array([sin_month,cos_month,sin_minute,cos_minute,
-                                               lat, lont, alt, daytime_flag, clearsky, ghi])
+                                               lat, lont, alt, daytime_flag, clearsky])
 
                         # Get image data
                         image_data = get_image_transformed(h5_data, channels, image_time_offset_idx, station_pixel_coords, image_dim[0])
