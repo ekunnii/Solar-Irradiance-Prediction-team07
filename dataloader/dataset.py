@@ -53,9 +53,6 @@ def get_image_transformed(h5_data: h5py.File, channels, image_time_offset_idx: i
     return all_channels
 
 
-# Variable used to debug locally
-local = True
-
 # This is used both in the evaluation and for testing
 def BuildDataSet(
     dataframe: pd.DataFrame,
@@ -73,8 +70,8 @@ def BuildDataSet(
 
     def _train_dataset():
 
-        for date_index, row in dataframe.loc["2011-12-1 08:00:00":].iterrows(): # TODO debug
-        #for date_index, row in dataframe.iterrows():
+        #for date_index, row in dataframe.loc["2011-12-1 08:00:00":].iterrows(): # TODO debug
+        for date_index, row in dataframe.iterrows():
 
             # Get image information
             hdf5_path = row['hdf5_8bit_path']
