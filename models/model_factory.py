@@ -3,7 +3,9 @@ import datetime
 import json
 
 from models.dummy_model import DummyModel
+from models.cnn2d import cnn2d
 import tensorflow as tf
+
 
 class ModelFactory():
     """
@@ -17,23 +19,24 @@ class ModelFactory():
             parameters are loaded automatically if the user provided a JSON file in their submission. Submitting
             such a JSON file is completely optional, and this argument can be ignored if not needed.
     """
+
     def __init__(self,
-        stations: typing.Dict[typing.AnyStr, typing.Tuple[float, float, float]],
-        target_time_offsets: typing.List[datetime.timedelta],
-        config: typing.Dict[typing.AnyStr, typing.Any],
-    ):
+                 stations: typing.Dict[typing.AnyStr, typing.Tuple[float, float, float]],
+                 target_time_offsets: typing.List[datetime.timedelta],
+                 config: typing.Dict[typing.AnyStr, typing.Any],
+                 ):
         self.stations = stations
         self.target_time_offsets = target_time_offsets
         self.config = config
 
         # Declare new models here and map builder function to it.
         self.models = {
-            "DummyModel": self.BuildDummyModel
+            "DummyModel": self.BuildDummyModel,
+            "CNN2D": self.BuildCNN2DModel
         }
 
     def build(self, modelName):
         return self.models[modelName]()
-
 
     def BuildDummyModel(self) -> tf.keras.Model:
         """
@@ -43,3 +46,12 @@ class ModelFactory():
             A ``tf.keras.Model`` object that can be used to generate new GHI predictions given imagery tensors.
         """
         return DummyModel(self.target_time_offsets)
+
+    def BuildCNN2DModel(self) -> tf.keras.Model:
+        """
+        A model example to test out workflow.
+
+        Returns:
+            A ``tf.keras.Model`` object that can be used to generate new GHI predictions given imagery tensors.
+        """
+        return cnn2d(self.target_time_offsets)
