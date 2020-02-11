@@ -6,6 +6,7 @@ import typing
 import json
 import os
 import tensorflow as tf
+import logging
 
 from models.model_factory import ModelFactory
 from dataloader.dataset import TrainingDataSet
@@ -48,8 +49,10 @@ if __name__ == "__main__":
                         help="Important for performance on the cluster!! If you want the files to be read fast, please set this variable.")   
     parser.add_argument("--training", type=bool, default=True,
                         help="Enable training or not")
+    parser.add_argument("--use_cache", type=bool, default=True,
+                        help="Use dataset cache or not")
     args = parser.parse_args()
-    
+
     # Load configs
     assert os.path.isfile(args.train_config), f"Invalid training configuration file: {args.train_config}"
     with open(args.train_config, "r") as tc:
@@ -60,7 +63,6 @@ if __name__ == "__main__":
         with open(args.user_config, "r") as uc:
             user_config_json = json.load(uc)
 
-
     cache_dir = args.scratch_dir or os.getcwd()
     batch_size = train_json.get("batch_size") or 32
     buffer_size = train_json.get("buffer_size") or 1000
@@ -68,14 +70,21 @@ if __name__ == "__main__":
     stations, target_time_offsets = extract_station_offsets(train_json)
 
     # Init models, dataset and other vars for the training loop
+    print("*******Create Model********")
     model_factory = ModelFactory(stations, target_time_offsets, args.user_config)
     model = model_factory.build(args.model_name)
 
-    dataset = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
+    print("*******Create training dataset********")
+    if args.use_cache:        
+        dataset = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
+            .prefetch(tf.data.experimental.AUTOTUNE) \
+            .batch(batch_size) \
+            .cache(cache_dir + "/tf_learn_cache") \
+            .shuffle(buffer_size)
+    else:
+        dataset = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
         .prefetch(tf.data.experimental.AUTOTUNE) \
-        .batch(batch_size) \
-        .cache(cache_dir + "/tf_learn_cache") \
-        .shuffle(buffer_size)
+        .batch(batch_size)
     
     train_loss_results = []
     train_accuracy_results = []
@@ -87,14 +96,19 @@ if __name__ == "__main__":
     for epoch in range(args.num_epochs):
         epoch_loss_avg = tf.keras.metrics.Mean()
 
-        for metas, images, targets in dataset:
+        print("*******EPOCH %d start********" % (epoch+1))
+
+        for iter_idx, (metas, images, targets) in enumerate(dataset):
 
             with tf.GradientTape() as tape:
                 y_ = model(metas, images)
-                loss_value =loss_fct(y_true=targets, y_pred=y_)
+                loss_value =loss_fct(y_true=targets, y_pred=y_)           
 
             # Track progress
             epoch_loss_avg(loss_value)  # Add current batch loss
+
+            if iter_idx % 999 ==0:
+                print("epoch : %d , iter: %d,  epoch loss:" % epoch + 1, iter_idx + 1, epoch_loss_avg.result())            
 
         # End epoch
         train_loss_results.append(epoch_loss_avg.result())
