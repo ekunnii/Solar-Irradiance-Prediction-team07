@@ -72,16 +72,21 @@ def BuildDataSet(
     output_seq_len = user_config and user_config["output_seq_len"] or 4
     channels = user_config and user_config["target_channels"] or ["ch1", "ch2", "ch3", "ch4", "ch6"]
 
-    def _train_dataset():
+    def _train_dataset(hdf5_path):
 
-        #for date_index, row in dataframe.loc["2011-12-1 08:00:00":].iterrows(): # TODO debug
-        for date_index, row in dataframe.iterrows():
+        #for date_index, row in dataframe.loc["2011-12-1 08:00:00":"2011-12-2 08:00:00"].iterrows(): # TODO debug
+        #for date_index, row in dataframe.iterrows():
 
             # Get image information
-            hdf5_path = row['hdf5_8bit_path']
-            if not hdf5_path == 'nan' and not hdf5_path == 'NaN' and not hdf5_path == 'NAN':
-                
-                with h5py.File(hdf5_path, "r") as h5_data:
+        #    hdf5_path = row['hdf5_8bit_path']
+        if not hdf5_path == 'nan' and not hdf5_path == 'NaN' and not hdf5_path == 'NAN':
+            
+            with h5py.File(hdf5_path, "r") as h5_data:
+
+                # get day time index from filename
+                date = hdf5_path.split(b"/")[-1].split(b".")
+                dataframe_day = dataframe.iloc[(dataframe.index.year == int(date[0])) & (dataframe.index.month == int(date[1])) & (dataframe.index.day == int(date[2]))]
+                for date_index, row in dataframe_day.iterrows():
                     # get h5 meta info
                     global_start_idx = h5_data.attrs["global_dataframe_start_idx"]
                     global_end_idx = h5_data.attrs["global_dataframe_end_idx"]
@@ -92,8 +97,7 @@ def BuildDataSet(
                     lats, lons = get_lats_lon(h5_data, h5_size)
                     if lats is None or lons is None:
                         continue
-                    #fetch_hdf5_sample = utils.fetch_hdf5_sample()
-                    #pdb.set_trace()
+                    
                     # Return one station at a time
                     for station_idx, coords in stations.items():
                         # get station specefic data / meta we want
@@ -104,7 +108,7 @@ def BuildDataSet(
                         sin_month,cos_month,sin_minute,cos_minute = utils.convert_time(row.name) #encoding months and hour/minutes
                         daytime_flag, clearsky, _, __ = row.loc[row.index.str.startswith(station_idx)]
                         meta_array = np.array([sin_month,cos_month,sin_minute,cos_minute,
-                                               lat, lont, alt, daytime_flag, clearsky])
+                                                lat, lont, alt, daytime_flag, clearsky])
 
                         # Get image data
                         image_data = get_image_transformed(h5_data, channels, image_time_offset_idx, station_pixel_coords, image_dim[0])
@@ -125,13 +129,25 @@ def BuildDataSet(
     # next(_train_dataset())
     # ## debugging
 
-    image_shape = (image_dim[0], image_dim[1], len(channels))
-    data_loader = tf.data.Dataset.from_generator(
-        _train_dataset, 
-        output_types=(tf.float64, tf.int8, tf.float64),
-    )
+    def wrap_generator(filename):
+        return tf.data.Dataset.from_generator(_train_dataset, args=[filename], output_types=(tf.float64, tf.int8, tf.float64))
+    
+    debug = True
+    if debug == True:
+        dataframe = dataframe.loc["2011-12-1 08:00:00":"2011-12-2 08:00:00"]
 
-    return data_loader
+    image_shape = (image_dim[0], image_dim[1], len(channels))
+    image_files_to_process = dataframe[('hdf5_8bit_path')] [(dataframe['hdf5_8bit_path'].str.contains('nan|NAN|NaN') == False)]
+    
+    files = tf.data.Dataset.from_tensor_slices(image_files_to_process)
+    dataset = files.interleave(wrap_generator, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    
+    # data_loader = tf.data.Dataset.from_generator(
+    #     _train_dataset, 
+    #     output_types=(tf.float64, tf.int8, tf.float64),
+    # )
+
+    return dataset
 
 
 class TrainingDataSet(tf.data.Dataset):
@@ -157,21 +173,3 @@ class TrainingDataSet(tf.data.Dataset):
         target_time_offsets = [pd.Timedelta(d).to_pytimedelta() for d in admin_config["target_time_offsets"]]
             
         return BuildDataSet(data_frame, stations, target_time_offsets, user_config)
-
-
-# if __name__ == "__main__":
-#     dataframe_path = "../data/catalog.helios.public.20100101-20160101_updated.pkl"
-#     stations = {
-#         "BND": [40.05192, -88.37309, 230],
-#         "TBL": [40.12498, -105.23680, 1689],
-#         "DRA": [36.62373, -116.01947, 1007],
-#         "FPK": [48.30783, -105.10170, 634],
-#         "GWN": [34.25470, -89.87290, 98],
-#         "PSU": [40.72012, -77.93085, 376],
-#         "SXF": [43.73403, -96.62328, 473]
-#     }
-#     import json
-#     with open('../train_config.json', "r") as tc:
-#         admin_json = json.load(tc)
-#
-#     data = TrainingDataSet(dataframe_path, stations, admin_json)

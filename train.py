@@ -8,10 +8,10 @@ import os
 import tensorflow as tf
 import pdb
 import time
+import pandas as pd
 
 from models.model_factory import ModelFactory
 from dataloader.dataset import TrainingDataSet
-from utils import *
 
 
 def extract_data_frame_path(train_config: json):
@@ -34,6 +34,7 @@ def extract_station_offsets(train_config: json):
 
 
 if __name__ == "__main__":
+    print("Entering training python script.")
 
     # Arguments passed to training script
     parser = argparse.ArgumentParser()
@@ -51,8 +52,8 @@ if __name__ == "__main__":
     parser.add_argument("--training", type=bool, default=True,
                         help="Enable training or not")
     args = parser.parse_args()
-    
-    print("Start Training!!")
+
+    print("Starting Training!") 
 
     # Load configs
     assert os.path.isfile(args.train_config), f"Invalid training configuration file: {args.train_config}"
@@ -78,8 +79,8 @@ if __name__ == "__main__":
     dataset = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
         .prefetch(tf.data.experimental.AUTOTUNE) \
         .batch(batch_size) \
-   #     .cache(cache_dir + "/tf_learn_cache") \
-    #    .shuffle(buffer_size)
+        #.cache(cache_dir + "/tf_learn_cache") \
+        #.shuffle(buffer_size)
     
     train_loss_results = []
     train_accuracy_results = []
@@ -87,16 +88,19 @@ if __name__ == "__main__":
     loss_fct = tf.keras.losses.MSE 
 
     print("Model and dataset loaded, starting main training loop...!!")
+
     # main loop
     for epoch in range(args.num_epochs):
         start_time = time.time()
         epoch_loss_avg = tf.keras.metrics.Mean()
+        start_time = time.time()
 
         for metas, images, targets in dataset:
-
+            
             with tf.GradientTape() as tape:
                 y_ = model(metas, images)
-                loss_value =loss_fct(y_true=targets, y_pred=y_)
+                loss_value = loss_fct(y_true=targets, y_pred=y_)
+                #print(f"Batch loss: {loss_value}")
 
             # Track progress
             epoch_loss_avg(loss_value)  # Add current batch loss
@@ -104,7 +108,7 @@ if __name__ == "__main__":
         # End epoch
         train_loss_results.append(epoch_loss_avg.result())
         print(f"Epoch result: {epoch_loss_avg.result()}")
-        end_time = time.time()
-        print(f"Epoch time elapsed: {end_time - start_time}")
+        print(f"Elapsed time for epoch: {time.time() - start_time}")
+
 
 
