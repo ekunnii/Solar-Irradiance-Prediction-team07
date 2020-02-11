@@ -7,6 +7,8 @@ import json
 import os
 import tensorflow as tf
 import logging
+import pdb
+import time
 
 from models.model_factory import ModelFactory
 from dataloader.dataset import TrainingDataSet
@@ -52,6 +54,8 @@ if __name__ == "__main__":
     parser.add_argument("--use_cache", type=bool, default=True,
                         help="Use dataset cache or not")
     args = parser.parse_args()
+    
+    print("Start Training!!")
 
     # Load configs
     assert os.path.isfile(args.train_config), f"Invalid training configuration file: {args.train_config}"
@@ -91,9 +95,10 @@ if __name__ == "__main__":
     is_training = args.training
     loss_fct = tf.keras.losses.MSE 
 
-
+    print("Model and dataset loaded, starting main training loop...!!")
     # main loop
     for epoch in range(args.num_epochs):
+        start_time = time.time()
         epoch_loss_avg = tf.keras.metrics.Mean()
 
         print("*******EPOCH %d start********" % (epoch+1))
@@ -112,5 +117,8 @@ if __name__ == "__main__":
 
         # End epoch
         train_loss_results.append(epoch_loss_avg.result())
+        print(f"Epoch result: {epoch_loss_avg.result()}")
+        end_time = time.time()
+        print(f"Epoch time elapsed: {end_time - start_time}")
 
 
