@@ -47,7 +47,10 @@ def get_image_transformed(h5_data: h5py.File, channels, image_time_offset_idx: i
         if raw_img is None or raw_img.shape != (650, 1500): 
             return None
         
-        array_cropped = utils.crop(copy.deepcopy(raw_img), station_pixel_coords, cropped_img_size)
+        try:
+            array_cropped = utils.crop(copy.deepcopy(raw_img), station_pixel_coords, cropped_img_size)
+        except:
+            return None
         # raw_data[array_idx, station_idx, channel_idx, ...] = cv.flip(array_cropped, 0) # TODO why the flip??
 
         #array = (((array.astype(np.float32) - norm_min) / (norm_max - norm_min)) * 255).astype(np.uint8) # TODO norm? 
