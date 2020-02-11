@@ -73,17 +73,12 @@ def BuildDataSet(
     channels = user_config and user_config["target_channels"] or ["ch1", "ch2", "ch3", "ch4", "ch6"]
 
     def _train_dataset(hdf5_path):
-
-        #for date_index, row in dataframe.loc["2011-12-1 08:00:00":"2011-12-2 08:00:00"].iterrows(): # TODO debug
-        #for date_index, row in dataframe.iterrows():
-
-            # Get image information
-        #    hdf5_path = row['hdf5_8bit_path']
+        # Load image file
         if not hdf5_path == 'nan' and not hdf5_path == 'NaN' and not hdf5_path == 'NAN':
             
             with h5py.File(hdf5_path, "r") as h5_data:
 
-                # get day time index from filename
+                # get day time index from filename, and itterate through all the day
                 date = hdf5_path.split(b"/")[-1].split(b".")
                 dataframe_day = dataframe.iloc[(dataframe.index.year == int(date[0])) & (dataframe.index.month == int(date[1])) & (dataframe.index.day == int(date[2]))]
                 for date_index, row in dataframe_day.iterrows():
@@ -125,27 +120,19 @@ def BuildDataSet(
                         yield (meta_array, image_data, station_ghis)
     # End of generator
 
-    # ## debugging
-    # next(_train_dataset())
-    # ## debugging
-
     def wrap_generator(filename):
         return tf.data.Dataset.from_generator(_train_dataset, args=[filename], output_types=(tf.float64, tf.int8, tf.float64))
     
-    debug = True
+    debug = False
     if debug == True:
-        dataframe = dataframe.loc["2011-12-1 08:00:00":"2011-12-2 08:00:00"]
+        dataframe = dataframe.loc["2011-12-1 08:00:00":"2011-12-02 07:45:00"] # single day data
 
-    image_shape = (image_dim[0], image_dim[1], len(channels))
+    # Only get dataloaders for image files that exist. 
     image_files_to_process = dataframe[('hdf5_8bit_path')] [(dataframe['hdf5_8bit_path'].str.contains('nan|NAN|NaN') == False)]
     
+    # Create an interleaved dataset so it's faster. Each dataset is responsible to load it's own compressed image file.
     files = tf.data.Dataset.from_tensor_slices(image_files_to_process)
     dataset = files.interleave(wrap_generator, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    
-    # data_loader = tf.data.Dataset.from_generator(
-    #     _train_dataset, 
-    #     output_types=(tf.float64, tf.int8, tf.float64),
-    # )
 
     return dataset
 
