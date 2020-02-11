@@ -12,6 +12,7 @@ import h5py
 np.set_printoptions(precision=4)
 
 if __name__ == "__main__":
+    print("Visualization program executing.")
     # hdf5_path = "/project/cq-training-1/project1/data/16bit-2014.01.01.0800.h5"
     hdf5_path = "/home/ryan/data/16bit-2014.01.01.0800.h5"
 
