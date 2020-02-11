@@ -22,6 +22,6 @@ pip install --no-index tqdm
 # which pip
 # pip freeze
 
-python ./train.py $PWD"/train_config.json" -n 1 -m "CNN2D" --train True --scratch_dir $SCRATCH 
+python ./train.py $PWD"/train_config.json" -n 1 -m "CNN2D" --train True --scratch_dir $SCRATCH --use_cache False
 python ./test.py
 
