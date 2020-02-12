@@ -125,6 +125,7 @@ def BuildDataSet(
                         # get station GHI targets
                         t_0 = row.name
                         station_ghis = []
+                        last_available_ghi = 0
                         for offset in target_time_offsets:
                             # remove negative value
                             if (t_0 + offset) in dataframe.index:
@@ -132,8 +133,9 @@ def BuildDataSet(
                                 if np.isnan(dataframe.loc[t_0 + offset][station_idx + "_GHI"]):
                                     station_ghis.append(
                                         round(max(dataframe.loc[t_0 + offset][station_idx + "_CLEARSKY_GHI"], 0), 2))
+                                    last_available_ghi = station_ghis[-1]
                             else:
-                                station_ghis.append(0.0)
+                                station_ghis.append(last_available_ghi)
 
                         if debug:
                             print(f"Returning data for {hdf5_path}")
@@ -161,7 +163,7 @@ def BuildDataSet(
                                 #     station_ghis.append(
                                 #         round(max((ghi_just_before+ghi_just_before)/2, 0), 2))
                                 # ##DEBUG
-                            else:
+                            # else:
                                 # ##DEBUG
                                 # jump_day = pd.Timedelta("P1DT0H0M0S", ).to_pytimedelta()
                                 # if (t_0 + offset - jump_day) in dataframe.index and (t_0 + offset + jump_day) in dataframe.index :
@@ -175,7 +177,7 @@ def BuildDataSet(
                                 # ##DEBUG
 
                                 # change negative ghi to 0 and round it
-                                station_ghis.append(round(max(dataframe.loc[t_0 + offset][station_idx + "_GHI"],0),2))
+                                # station_ghis.append(round(max(dataframe.loc[t_0 + offset][station_idx + "_GHI"],0),2))
 
                         yield (meta_array, image_data, station_ghis)
 
