@@ -12,6 +12,10 @@ import time
 import pandas as pd
 
 import matplotlib.pyplot as plt
+import pdb
+import time
+import logging
+import pandas as pd
 
 from models.model_factory import ModelFactory
 from dataloader.dataset import TrainingDataSet
@@ -21,7 +25,7 @@ tf.keras.backend.set_floatx('float64')
 
 def extract_data_frame_path(train_config: json):
     """
-    It checks if we have a file 
+    It checks if we have a file
     """
     if os.path.isfile(train_config["dataframe_path"]):
         return train_config["dataframe_path"]
@@ -59,8 +63,9 @@ if __name__ == "__main__":
                         help="Important for performance on the cluster!! If you want the files to be read fast, please set this variable.")
     parser.add_argument("--training", type=bool, default=True,
                         help="Enable training or not")
-    parser.add_argument("--use_cache", type=bool, default=True,
-                        help="Use dataset cache or not")
+    parser.add_argument("--dont_use_cache", dest='dont_use_cache', action='store_true',
+                        help="Add this flag if you don't want to use dataset cache")
+
     args = parser.parse_args()
 
     print("Starting Training!") 
@@ -89,9 +94,7 @@ if __name__ == "__main__":
     model = model_factory.build(args.model_name)
 
     print("*******Create training dataset********")
-    print("Cache flag is:",args.use_cache)
-    if args.use_cache:
-        
+    if not args.dont_use_cache:
         dataset = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
             .prefetch(tf.data.experimental.AUTOTUNE) \
             .batch(batch_size) \
@@ -105,11 +108,11 @@ if __name__ == "__main__":
     train_loss_results = []
     train_accuracy_results = []
     is_training = args.training
-    loss_fct = tf.keras.losses.
+    loss_fct = tf.keras.losses.MSE
 
     print("Model and dataset loaded, starting main training loop...!!")
 
-
+    logging.basicConfig(filename='/project/cq-training-1/project1/teams/team07/result.log',level=logging.DEBUG)
 
     # main loop
     for epoch in range(args.num_epochs):
@@ -146,8 +149,6 @@ if __name__ == "__main__":
 
         # End epoch
         train_loss_results.append(epoch_loss_avg.result())
+        logging.debug(train_loss_results)
         print(f"Epoch result: {epoch_loss_avg.result()}")
         print(f"Elapsed time for epoch: {time.perf_counter() - start_time}")
-
-
-
