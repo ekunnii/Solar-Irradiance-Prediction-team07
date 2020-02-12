@@ -48,7 +48,10 @@ def get_image_transformed(h5_data: h5py.File, channels, image_time_offset_idx: i
         if raw_img is None or raw_img.shape != (650, 1500): 
             return None
         
-        array_cropped = utils.crop(copy.deepcopy(raw_img), station_pixel_coords, cropped_img_size)
+        try:
+            array_cropped = utils.crop(copy.deepcopy(raw_img), station_pixel_coords, cropped_img_size)
+        except:
+            return None
         # raw_data[array_idx, station_idx, channel_idx, ...] = cv.flip(array_cropped, 0) # TODO why the flip??
 
         #array = (((array.astype(np.float32) - norm_min) / (norm_max - norm_min)) * 255).astype(np.uint8) # TODO norm? 
@@ -72,17 +75,20 @@ def BuildDataSet(
     image_dim = user_config and user_config["image_dim"] or (64, 64)
     output_seq_len = user_config and user_config["output_seq_len"] or 4
     channels = user_config and user_config["target_channels"] or ["ch1", "ch2", "ch3", "ch4", "ch6"]
+    debug = user_config and user_config["debug"] or False
 
-    def _train_dataset():
+    def _train_dataset(hdf5_path):
+        # Load image file
+        if not hdf5_path == 'nan' and not hdf5_path == 'NaN' and not hdf5_path == 'NAN':
+            
+            with h5py.File(hdf5_path, "r") as h5_data:
 
-        #for date_index, row in dataframe.loc["2011-12-1 08:00:00":].iterrows(): # TODO debug
-        for date_index, row in dataframe.iterrows():
-
-            # Get image information
-            hdf5_path = row['hdf5_8bit_path']
-            if not hdf5_path == 'nan' and not hdf5_path == 'NaN' and not hdf5_path == 'NAN':
+                # get day time index from filename, and itterate through all the day
+                date = hdf5_path.split(b"/")[-1].split(b".")
+                dataframe_day = dataframe.iloc[(dataframe.index.year == int(date[0])) & (dataframe.index.month == int(date[1])) & (dataframe.index.day == int(date[2]))]
+                assert dataframe_day.shape, f"No dataframe for {date}"
                 
-                with h5py.File(hdf5_path, "r") as h5_data:
+                for date_index, row in dataframe_day.iterrows():
                     # get h5 meta info
                     global_start_idx = h5_data.attrs["global_dataframe_start_idx"]
                     global_end_idx = h5_data.attrs["global_dataframe_end_idx"]
@@ -94,8 +100,7 @@ def BuildDataSet(
                     lats, lons = get_lats_lon(h5_data, h5_size)
                     if lats is None or lons is None:
                         continue
-                    #fetch_hdf5_sample = utils.fetch_hdf5_sample()
-                    #pdb.set_trace()
+                    
                     # Return one station at a time
                     for station_idx, coords in stations.items():
                         # get station specefic data / meta we want
@@ -106,75 +111,50 @@ def BuildDataSet(
                         sin_month,cos_month,sin_minute,cos_minute = utils.convert_time(row.name) #encoding months and hour/minutes
                         daytime_flag, clearsky, _, __ = row.loc[row.index.str.startswith(station_idx)]
                         meta_array = np.array([sin_month,cos_month,sin_minute,cos_minute,
-                                               lat, lont, alt, daytime_flag, clearsky])
+                                                lat, lont, alt, daytime_flag, clearsky])
 
                         # Get image data
                         image_data = get_image_transformed(h5_data, channels, image_time_offset_idx, station_pixel_coords, image_dim[0])
                         if image_data is None:
+                            if debug:
+                                print("No croped image")
                             continue
 
                         # get station GHI targets
                         t_0 = row.name
                         station_ghis = []
                         for offset in target_time_offsets:
+                            # remove negative value
+                            station_ghis.append(round(max(dataframe.loc[t_0 + offset][station_idx + "_GHI"],0),2))
 
-                            if np.isnan(dataframe.loc[t_0 + offset][station_idx + "_GHI"]):
-                                station_ghis.append(
-                                    round(max(dataframe.loc[t_0 + offset][station_idx + "_CLEARSKY_GHI"], 0), 2))
-
-                                # ##DEBUG
-                                # # Try to extrapolate with close available ghi when possible and clearsky when its not
-                                # # However, ghi seems to be always unavailable in big gaps.
-                                # # So changed it so it's always using clearsky
-
-                                # offset_15min = pd.Timedelta("P0DT0H15M0S", ).to_pytimedelta()
-                                # ghi_just_before = dataframe.loc[t_0 + offset - offset_15min][station_idx + "_GHI"]
-                                # ghi_just_after = dataframe.loc[t_0 + offset + offset_15min][station_idx + "_GHI"]
-                                # if np.isnan(ghi_just_before) or np.isnan(ghi_just_after):
-                                #     ghi_just_before = dataframe.loc[t_0 + offset - (offset_15min*2)][station_idx + "_GHI"]
-                                #     ghi_just_after = dataframe.loc[t_0 + offset + (offset_15min*2)][station_idx + "_GHI"]
-                                # # ghi is not available for a gap of time, then use clearsky
-                                # if np.isnan(ghi_just_before) or np.isnan(ghi_just_after):
-                                #     print('clearsky', station_idx,dataframe.loc[t_0 + offset][station_idx + "_GHI"], ghi_just_before, ghi_just_after, dataframe.loc[t_0 + offset][station_idx + "_CLEARSKY_GHI"])
-                                #     station_ghis.append(
-                                #         round(max(dataframe.loc[t_0 + offset][station_idx + "_CLEARSKY_GHI"], 0), 2))
-                                # else:
-                                #     print('extrapolate',station_idx,dataframe.loc[t_0 + offset][station_idx + "_GHI"], ghi_just_before, ghi_just_after, (ghi_just_before+ghi_just_after)/2)
-                                #     station_ghis.append(
-                                #         round(max((ghi_just_before+ghi_just_before)/2, 0), 2))
-                                # ##DEBUG
-                            else:
-                                # ##DEBUG
-                                # jump_day = pd.Timedelta("P1DT0H0M0S", ).to_pytimedelta()
-                                # if (t_0 + offset - jump_day) in dataframe.index and (t_0 + offset + jump_day) in dataframe.index :
-                                #     day_before = dataframe.loc[t_0 + offset - jump_day][station_idx + "_GHI"]
-                                #     day_after = dataframe.loc[t_0 + offset + jump_day][station_idx + "_GHI"]
-                                #
-                                #     offset_15min = pd.Timedelta("P0DT0H15M0S", ).to_pytimedelta()
-                                #     ghi_just_before = dataframe.loc[t_0 + offset - offset_15min][station_idx + "_GHI"]
-                                #     ghi_just_after = dataframe.loc[t_0 + offset + offset_15min][station_idx + "_GHI"]
-                                #     print('ghi',station_idx,dataframe.loc[t_0 + offset][station_idx + "_GHI"], 'clearsky', dataframe.loc[t_0 + offset][station_idx + "_CLEARSKY_GHI"], 'days ext', (day_before+day_after)/2, 'neighbor extr', (ghi_just_before+ghi_just_after)/2)
-                                # ##DEBUG
-
-                                # change negative ghi to 0 and round it
-                                station_ghis.append(round(max(dataframe.loc[t_0 + offset][station_idx + "_GHI"],0),2))
-                        
+                        if debug:
+                            print(f"Returning data for {hdf5_path}")
                         yield (meta_array, image_data, station_ghis)
+
+                #pdb.set_trace()
+                if debug:
+                    print(f"Not yielding any results! or done... {hdf5_path}")
+                #raise StopIteration
+                return
     # End of generator
 
-    # ## debugging
-    # #next(_train_dataset())
-    # for i in _train_dataset():
-    #     print()
-    # ## debugging
+    def wrap_generator(filename):
+        return tf.data.Dataset.from_generator(_train_dataset, args=[filename], output_types=(tf.float64, tf.int8, tf.float64))
+    
+    if debug == True:
+        dataframe = dataframe.loc["2010-01-1 08:00:00":"2010-04-30 07:45:00"] # single day data
 
-    image_shape = (image_dim[0], image_dim[1], len(channels))
-    data_loader = tf.data.Dataset.from_generator(
-        _train_dataset, 
-        output_types=(tf.float64, tf.int8, tf.float64),
-    )
+    # first 3 months are empty, remove to iterate faster. 
+    dataframe = dataframe.loc["2010-04-13 08:00:00":]
+    
+    # Only get dataloaders for image files that exist. 
+    image_files_to_process = dataframe[('hdf5_8bit_path')] [(dataframe['hdf5_8bit_path'].str.contains('nan|NAN|NaN') == False)].unique()
+    
+    # Create an interleaved dataset so it's faster. Each dataset is responsible to load it's own compressed image file.
+    files = tf.data.Dataset.from_tensor_slices(image_files_to_process)
+    dataset = files.interleave(wrap_generator, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
-    return data_loader
+    return dataset
 
 
 class TrainingDataSet(tf.data.Dataset):
@@ -218,26 +198,3 @@ class TrainingDataSet(tf.data.Dataset):
         target_time_offsets = [pd.Timedelta(d).to_pytimedelta() for d in admin_config["target_time_offsets"]]
             
         return BuildDataSet(data_frame, stations, target_time_offsets, user_config)
-
-# ## debug
-# if __name__ == "__main__":
-#     pd.set_option('display.max_columns', None)  # or 1000
-#     pd.set_option('display.max_rows', None)  # or 1000
-#     pd.set_option('display.max_colwidth', None)  # or 199
-#
-#     dataframe_path = "../data/catalog.helios.public.20100101-20160101_updated.pkl"
-#     stations = {
-#         "BND": [40.05192, -88.37309, 230],
-#         "TBL": [40.12498, -105.23680, 1689],
-#         "DRA": [36.62373, -116.01947, 1007],
-#         "FPK": [48.30783, -105.10170, 634],
-#         "GWN": [34.25470, -89.87290, 98],
-#         "PSU": [40.72012, -77.93085, 376],
-#         "SXF": [43.73403, -96.62328, 473]
-#     }
-#     import json
-#     with open('../train_config.json', "r") as tc:
-#         admin_json = json.load(tc)
-#
-#     data = TrainingDataSet(dataframe_path, stations, admin_json)
-# ## debug

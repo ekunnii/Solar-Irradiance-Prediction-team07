@@ -13,7 +13,6 @@
 import subprocess
 import sys, os
 import argparse
-import pandas as pd
 
 parser = argparse.ArgumentParser(description='Process some integers.')
 
@@ -48,6 +47,8 @@ if args.update_ssh:
     #print (fileNames)
 
 if args.update_pkl:
+    
+    import pandas as pd
     ## Update pickel to reflect current directory folders
     dataFrame = pd.read_pickle(args.f + "/catalog.helios.public.20100101-20160101.pkl")
     print("Updating dataframe... this may take a while!")

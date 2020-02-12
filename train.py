@@ -9,10 +9,10 @@ import tensorflow as tf
 import logging
 import pdb
 import time
+import pandas as pd
 
 from models.model_factory import ModelFactory
 from dataloader.dataset import TrainingDataSet
-from utils import *
 
 
 def extract_data_frame_path(train_config: json):
@@ -36,6 +36,7 @@ def extract_station_offsets(train_config: json):
 
 
 if __name__ == "__main__":
+    print("Entering training python script.")
 
     # Arguments passed to training script
     parser = argparse.ArgumentParser()
@@ -56,7 +57,7 @@ if __name__ == "__main__":
                         help="Use dataset cache or not")
     args = parser.parse_args()
 
-    print("Start Training!!")
+    print("Starting Training!") 
 
     # Load configs
     assert os.path.isfile(
@@ -99,28 +100,41 @@ if __name__ == "__main__":
     loss_fct = tf.keras.losses.MSE
 
     print("Model and dataset loaded, starting main training loop...!!")
+
     # main loop
     for epoch in range(args.num_epochs):
-        start_time = time.time()
+        datafetch_time = time.perf_counter()
         epoch_loss_avg = tf.keras.metrics.Mean()
+        start_time = time.perf_counter()
+        count = 0
 
         print("*******EPOCH %d start********" % (epoch+1))
 
         for iter_idx, (metas, images, targets) in enumerate(dataset):
-
+            if count == 10:
+                print(f"Data Fetch time: {time.perf_counter() - datafetch_time}, for batch size: {metas.shape[0]}")
+                count = 0
+                
+            
             with tf.GradientTape() as tape:
                 y_ = model(metas, images)
                 loss_value = loss_fct(y_true=targets, y_pred=y_)
-
+                #print(f"Batch loss: {loss_value}")
+                
             # Track progress
             epoch_loss_avg(loss_value)  # Add current batch loss
+            count += 1
+            if count == 10:
+                datafetch_time = time.perf_counter()
 
-            if iter_idx % 999 == 0:
+            if iter_idx % 9 == 0:
                 print("epoch : %d , iter: %d,  epoch loss: %s" %
                       epoch + 1, iter_idx + 1, epoch_loss_avg.result())
 
         # End epoch
         train_loss_results.append(epoch_loss_avg.result())
         print(f"Epoch result: {epoch_loss_avg.result()}")
-        end_time = time.time()
-        print(f"Epoch time elapsed: {end_time - start_time}")
+        print(f"Elapsed time for epoch: {time.perf_counter() - start_time}")
+
+
+
