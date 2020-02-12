@@ -185,11 +185,12 @@ def BuildDataSet(
     def wrap_generator(filename):
         return tf.data.Dataset.from_generator(_train_dataset, args=[filename], output_types=(tf.float64, tf.float64, tf.float64))
 
-    debug = False
-    if debug == True:
-        dataframe = dataframe.loc["2010-01-1 08:00:00":"2010-04-30 07:45:00"] # single day data
+    # debug = False
+    # if debug == True:
+    #     dataframe = dataframe.loc["2010-01-1 08:00:00":"2010-04-30 07:45:00"] # single day data
 
-    dataframe = dataframe.loc[admin_config["start_bound"] + ' 08:00:00':admin_config["end_bound"] + ' 08:00:00']
+    dataframe = dataframe.loc[admin_config["start_bound"] + ' 08:00:00':admin_config["end_bound"] + ' 07:45:00']
+    #dataframe = dataframe.loc[admin_config["start_bound"] + ' 08:00:00':admin_config["end_bound"] + ' 07:45:00']
 
     # first 3 months are empty, remove to iterate faster.
     #dataframe = dataframe.loc["2010-04-13 08:00:00":]

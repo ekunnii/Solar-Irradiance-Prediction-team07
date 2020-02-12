@@ -10,6 +10,7 @@ import pdb
 import time
 import logging
 import pandas as pd
+import numpy as np
 
 from models.model_factory import ModelFactory
 from dataloader.dataset import TrainingDataSet
@@ -96,10 +97,12 @@ if __name__ == "__main__":
     train_accuracy_results = []
     is_training = args.training
     loss_fct = tf.keras.losses.MSE
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.00000001)
 
     print("Model and dataset loaded, starting main training loop...!!")
 
-    logging.basicConfig(filename='/project/cq-training-1/project1/teams/team07/result.log',level=logging.DEBUG)
+    #logging.basicConfig(filename='/project/cq-training-1/project1/teams/team07/result.log',level=logging.DEBUG)
+    logging.basicConfig(filename='result.log', level=logging.DEBUG)
 
     # main loop
     for epoch in range(args.num_epochs):
@@ -116,9 +119,15 @@ if __name__ == "__main__":
                 print(f"Data Fetch time: {time.perf_counter() - datafetch_time}, for batch size: {metas.shape[0]}")
 
             with tf.GradientTape() as tape:
-                y_ = model(metas, images)
+                images = tf.keras.utils.normalize(images,axis=-1)
+
+                y_ = model(metas, images, training=True)
                 loss_value = loss_fct(y_true=targets, y_pred=y_)
+                print(f"Batch loss {iteration}: {np.mean(loss_value)}")
                 #print(f"Batch loss: {loss_value}")
+
+            grads = tape.gradient(loss_value, model.trainable_variables)
+            optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
             # Track progress
             epoch_loss_avg(loss_value)  # Add current batch loss

@@ -1,6 +1,7 @@
 import tensorflow as tf
 from tensorflow.keras.layers import Dense, Flatten, Conv2D, MaxPooling2D
 from tensorflow.keras import Model
+import numpy as np
 
 
 class cnn2d(Model):
@@ -16,6 +17,7 @@ class cnn2d(Model):
         self.d2 = Dense(len(target_time_offsets), activation="linear")
 
     def call(self, metas, images):
+        assert not np.any(np.isnan(images))
         x = self.conv1(images)
         x = self.maxpool(x)
         x = self.conv2(x)

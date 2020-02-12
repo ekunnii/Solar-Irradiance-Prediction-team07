@@ -669,7 +669,7 @@ def crop(array, center, cropped_img_size):
         # move corners that are above the border and shift the corresponding corner to keep the correct cropped size
         corner_coord[i] -= max(0, corner_coord[((i//2)*2)+1] - array.shape[i//2])
 
-    assert (0 < array).any(), f"Cropping failed. Array {array.shape}, Crop size {crop_size}, Center {center}, Corners of tentatively cropped image {corner_coord}"
+    #assert (0 < array).any(), f"Cropping failed. Array {array.shape}, Crop size {crop_size}, Center {center}, Corners of tentatively cropped image {corner_coord}"
 
     return array[corner_coord[0]:corner_coord[1], corner_coord[2]:corner_coord[3]]
 
