@@ -16,7 +16,8 @@ class cnn2d(Model):
         self.d2 = Dense(len(target_time_offsets), activation="linear")
 
     def call(self, metas, images):
-        x = self.conv1(x)
+        tf.keras.backend.set_floatx('float64')
+        x = self.conv1(images)
         x = self.maxpool(x)
         x = self.conv2(x)
         x = self.maxpool(x)
@@ -25,7 +26,3 @@ class cnn2d(Model):
         x = self.flatten(x)
         x = self.d1(x)
         return self.d2(x)
-
-
-if __name__ == "__main__":
-    cnn2d_model = cnn2d(target_time_offsets=[1, 2, 3, 4])

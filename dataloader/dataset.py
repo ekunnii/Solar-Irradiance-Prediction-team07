@@ -95,7 +95,7 @@ def BuildDataSet(
                     h5_size = global_end_idx - global_start_idx
                     global_start_time = datetime.datetime.strptime(h5_data.attrs["global_dataframe_start_time"], "%Y.%m.%d.%H%M")
                     image_time_offset_idx = (date_index - global_start_time) / datetime.timedelta(minutes=15)
-                    print("hdf5_path:", hdf5_path)
+                    # print("hdf5_path:", hdf5_path)
 
                     lats, lons = get_lats_lon(h5_data, h5_size)
                     if lats is None or lons is None:
@@ -111,10 +111,11 @@ def BuildDataSet(
                         sin_month,cos_month,sin_minute,cos_minute = utils.convert_time(row.name) #encoding months and hour/minutes
                         daytime_flag, clearsky, _, __ = row.loc[row.index.str.startswith(station_idx)]
                         meta_array = np.array([sin_month,cos_month,sin_minute,cos_minute,
-                                                lat, lont, alt, daytime_flag, clearsky])
+                                                lat, lont, alt, daytime_flag, clearsky], dtype=np.float64)
 
                         # Get image data
                         image_data = get_image_transformed(h5_data, channels, image_time_offset_idx, station_pixel_coords, image_dim[0])
+                        image_data = image_data/255.0
                         if image_data is None:
                             if debug:
                                 print("No croped image")
@@ -125,7 +126,10 @@ def BuildDataSet(
                         station_ghis = []
                         for offset in target_time_offsets:
                             # remove negative value
-                            station_ghis.append(round(max(dataframe.loc[t_0 + offset][station_idx + "_GHI"],0),2))
+                            if (t_0 + offset) in dataframe.index:
+                                station_ghis.append(round(max(dataframe.loc[t_0 + offset][station_idx + "_GHI"],0),2))
+                            else:
+                                station_ghis.append(0.0)
 
                         if debug:
                             print(f"Returning data for {hdf5_path}")
@@ -139,13 +143,13 @@ def BuildDataSet(
     # End of generator
 
     def wrap_generator(filename):
-        return tf.data.Dataset.from_generator(_train_dataset, args=[filename], output_types=(tf.float64, tf.int8, tf.float64))
+        return tf.data.Dataset.from_generator(_train_dataset, args=[filename], output_types=(tf.float64, tf.float64, tf.float64))
     
     if debug == True:
         dataframe = dataframe.loc["2010-01-1 08:00:00":"2010-04-30 07:45:00"] # single day data
 
     # first 3 months are empty, remove to iterate faster. 
-    dataframe = dataframe.loc["2010-04-13 08:00:00":]
+    # dataframe = dataframe.loc["2010-04-13 08:00:00":]
     
     # Only get dataloaders for image files that exist. 
     image_files_to_process = dataframe[('hdf5_8bit_path')] [(dataframe['hdf5_8bit_path'].str.contains('nan|NAN|NaN') == False)].unique()
@@ -177,7 +181,7 @@ class TrainingDataSet(tf.data.Dataset):
             data_frame = data_frame[data_frame.index >= datetime.datetime.fromisoformat(
                 admin_config["start_bound"])]
         if "end_bound" in admin_config:
-            data_frame = data_frame[data_frame.index < datetime.datetime.fromisoformat(
+            data_frame = data_frame[data_frame.index <= datetime.datetime.fromisoformat(
                 admin_config["end_bound"])]
 
 

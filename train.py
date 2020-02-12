@@ -11,8 +11,12 @@ import pdb
 import time
 import pandas as pd
 
+import matplotlib.pyplot as plt
+
 from models.model_factory import ModelFactory
 from dataloader.dataset import TrainingDataSet
+
+tf.keras.backend.set_floatx('float64')
 
 
 def extract_data_frame_path(train_config: json):
@@ -34,6 +38,8 @@ def extract_station_offsets(train_config: json):
     target_time_offsets = train_config["target_time_offsets"]
     return stations, target_time_offsets
 
+def plot_loss(loss_values):
+    plt.figure()
 
 if __name__ == "__main__":
     print("Entering training python script.")
@@ -83,7 +89,9 @@ if __name__ == "__main__":
     model = model_factory.build(args.model_name)
 
     print("*******Create training dataset********")
+    print("Cache flag is:",args.use_cache)
     if args.use_cache:
+        
         dataset = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
             .prefetch(tf.data.experimental.AUTOTUNE) \
             .batch(batch_size) \
@@ -97,9 +105,11 @@ if __name__ == "__main__":
     train_loss_results = []
     train_accuracy_results = []
     is_training = args.training
-    loss_fct = tf.keras.losses.MSE
+    loss_fct = tf.keras.losses.
 
     print("Model and dataset loaded, starting main training loop...!!")
+
+
 
     # main loop
     for epoch in range(args.num_epochs):
@@ -112,14 +122,17 @@ if __name__ == "__main__":
 
         for iter_idx, (metas, images, targets) in enumerate(dataset):
             if count == 10:
-                print(f"Data Fetch time: {time.perf_counter() - datafetch_time}, for batch size: {metas.shape[0]}")
+                # print(f"Data Fetch time: {time.perf_counter() - datafetch_time}, for batch size: {metas.shape[0]}")
                 count = 0
                 
             
             with tf.GradientTape() as tape:
                 y_ = model(metas, images)
                 loss_value = loss_fct(y_true=targets, y_pred=y_)
-                #print(f"Batch loss: {loss_value}")
+                if iter_idx % 9 == 0:
+                    print("********predicted value")
+                    print(y_)
+                    print(f"Batch loss: {loss_value}")
                 
             # Track progress
             epoch_loss_avg(loss_value)  # Add current batch loss
@@ -129,7 +142,7 @@ if __name__ == "__main__":
 
             if iter_idx % 9 == 0:
                 print("epoch : %d , iter: %d,  epoch loss: %s" %
-                      epoch + 1, iter_idx + 1, epoch_loss_avg.result())
+                      (epoch + 1, iter_idx + 1, loss_value))
 
         # End epoch
         train_loss_results.append(epoch_loss_avg.result())
