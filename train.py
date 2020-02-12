@@ -52,8 +52,9 @@ if __name__ == "__main__":
                         help="Important for performance on the cluster!! If you want the files to be read fast, please set this variable.")
     parser.add_argument("--training", type=bool, default=True,
                         help="Enable training or not")
-    parser.add_argument("--use_cache", type=bool, default=True,
-                        help="Use dataset cache or not")
+    parser.add_argument("--dont_use_cache", dest='dont_use_cache', action='store_true',
+                        help="Add this flag if you don't want to use dataset cache")
+
     args = parser.parse_args()
 
     print("Starting Training!")
@@ -80,7 +81,7 @@ if __name__ == "__main__":
     model = model_factory.build(args.model_name)
 
     print("*******Create training dataset********")
-    if args.use_cache:
+    if not args.dont_use_cache:
         dataset = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
             .prefetch(tf.data.experimental.AUTOTUNE) \
             .batch(batch_size) \
@@ -98,6 +99,8 @@ if __name__ == "__main__":
 
     print("Model and dataset loaded, starting main training loop...!!")
 
+    logging.basicConfig(filename='/project/cq-training-1/project1/teams/team07/result.log',level=logging.DEBUG)
+
     # main loop
     for epoch in range(args.num_epochs):
         datafetch_time = time.perf_counter()
@@ -105,7 +108,7 @@ if __name__ == "__main__":
         start_time = time.perf_counter()
 
         print("*******EPOCH %d start********" % (epoch+1))
-
+        iteration = 0
         for metas, images, targets in dataset:
             print(f"Data Fetch time: {time.perf_counter() - datafetch_time}, for batch size: {metas.shape[0]}")
 
@@ -118,10 +121,12 @@ if __name__ == "__main__":
             epoch_loss_avg(loss_value)  # Add current batch loss
             datafetch_time = time.perf_counter()
 
-            if iter_idx % 999 ==0:
-                print("epoch : %d , iter: %d,  epoch loss:" % epoch + 1, iter_idx + 1, epoch_loss_avg.result())
+            iteration += 1
+            if iteration % 999 ==0:
+                print("epoch : %d , iter: %d,  epoch loss:" % epoch + 1, iteration + 1, epoch_loss_avg.result())
 
         # End epoch
         train_loss_results.append(epoch_loss_avg.result())
+        logging.debug(train_loss_results)
         print(f"Epoch result: {epoch_loss_avg.result()}")
         print(f"Elapsed time for epoch: {time.perf_counter() - start_time}")

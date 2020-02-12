@@ -18,6 +18,7 @@ import datetime
 import pdb
 import h5py
 import copy
+import json
 
 def set_faster_path(original_file, scratch_dir):
     if scratch_dir == None or scratch_dir == "":
@@ -51,7 +52,7 @@ def get_image_transformed(h5_data: h5py.File, channels, image_time_offset_idx: i
         # raw_data[array_idx, station_idx, channel_idx, ...] = cv.flip(array_cropped, 0) # TODO why the flip??
 
         #array = (((array.astype(np.float32) - norm_min) / (norm_max - norm_min)) * 255).astype(np.uint8) # TODO norm?
-        array_cropped = array_cropped.astype(np.uint8) # convert to image format
+        array_cropped = array_cropped.astype(np.float64) # convert to image format
         all_channels[:,:,ch_idx] = array_cropped
 
     return all_channels
@@ -62,6 +63,7 @@ def BuildDataSet(
     dataframe: pd.DataFrame,
     stations: typing.Dict[typing.AnyStr, typing.Tuple[float, float, float]],
     target_time_offsets: typing.List[datetime.timedelta],
+    admin_config: typing.Dict[typing.AnyStr, typing.Any],# same as use functions in evaluation code, JSON format
     user_config: typing.Dict[typing.AnyStr, typing.Any],# same as use functions in evaluation code, JSON format
     target_datetimes: typing.List[datetime.datetime] = None, # This is used for evaluation!! This is the taget dates we want. No need for training
     copy_last_if_missing: bool = True,
@@ -78,7 +80,7 @@ def BuildDataSet(
 
             with h5py.File(hdf5_path, "r") as h5_data:
 
-                # get day time index from filename, and itterate through all the day
+                # get day time index from filename, and iterate through all the day
                 date = hdf5_path.split(b"/")[-1].split(b".")
                 dataframe_day = dataframe.iloc[(dataframe.index.year == int(date[0])) & (dataframe.index.month == int(date[1])) & (dataframe.index.day == int(date[2]))]
                 for date_index, row in dataframe_day.iterrows():
@@ -162,18 +164,20 @@ def BuildDataSet(
     # ## debugging
     # #next(_train_dataset())
     # for i in _train_dataset():
-    #     print()
+    #     print(i)
     # ## debugging
 
     def wrap_generator(filename):
-        return tf.data.Dataset.from_generator(_train_dataset, args=[filename], output_types=(tf.float64, tf.int8, tf.float64))
+        return tf.data.Dataset.from_generator(_train_dataset, args=[filename], output_types=(tf.float64, tf.float64, tf.float64))
 
     debug = False
     if debug == True:
         dataframe = dataframe.loc["2011-12-1 08:00:00":"2011-12-02 07:45:00"] # single day data
 
+    dataframe = dataframe.loc[admin_config["start_bound"] + ' 08:00:00':admin_config["end_bound"] + ' 08:00:00']
+
     # Only get dataloaders for image files that exist.
-    image_files_to_process = dataframe[('hdf5_8bit_path')] [(dataframe['hdf5_8bit_path'].str.contains('nan|NAN|NaN') == False)]
+    image_files_to_process = dataframe[('hdf5_8bit_path')][(dataframe['hdf5_8bit_path'].str.contains('nan|NAN|NaN') == False)]
 
     # Create an interleaved dataset so it's faster. Each dataset is responsible to load it's own compressed image file.
     files = tf.data.Dataset.from_tensor_slices(image_files_to_process)
@@ -198,8 +202,15 @@ class TrainingDataSet(tf.data.Dataset):
 
         data_frame = pd.read_pickle(fast_data_frame_path)
 
+        # with open(admin_config, "r") as tc:
+        #     train_json = json.load(tc)
+        # print(datetime.datetime.fromisoformat(admin_config.get("start_bound")+' 08:00:00'))
+        # data_frame = data_frame.loc[admin_config["start_bound"]+' 08:00:00':admin_config["end_bound"]+' 08:00:00']
+        # data_frame = data_frame[data_frame.index >= datetime.datetime.fromisoformat(admin_config["start_bound"]+' 08:00:00')]
+        # data_frame = data_frame[data_frame.index <= datetime.datetime.fromisoformat(admin_config["end_bound"]+' 08:00:00')]
+        # print(data_frame.head())
+
         # ## debug
-        # # data_frame = data_frame[data_frame.index >= datetime.datetime.fromisoformat('2010-05-01 08:00:00')]
         # data_frame = data_frame[data_frame.index >= datetime.datetime.fromisoformat('2010-05-01 13:45:00')]
         # # data_frame = data_frame[data_frame.index >= datetime.datetime.fromisoformat('2010-05-04 01:15:00')]
         # # print(data_frame["BND_GHI"].value_counts())
@@ -214,7 +225,7 @@ class TrainingDataSet(tf.data.Dataset):
 
         target_time_offsets = [pd.Timedelta(d).to_pytimedelta() for d in admin_config["target_time_offsets"]]
 
-        return BuildDataSet(data_frame, stations, target_time_offsets, user_config)
+        return BuildDataSet(data_frame, stations, target_time_offsets, admin_config, user_config)
 
 # ## debug
 # if __name__ == "__main__":

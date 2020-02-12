@@ -16,7 +16,7 @@ class cnn2d(Model):
         self.d2 = Dense(len(target_time_offsets), activation="linear")
 
     def call(self, metas, images):
-        x = self.conv1(x)
+        x = self.conv1(images)
         x = self.maxpool(x)
         x = self.conv2(x)
         x = self.maxpool(x)
