@@ -23,6 +23,9 @@ from dataloader.dataset import TrainingDataSet
 tf.keras.backend.set_floatx('float64')
 
 
+
+
+
 def extract_data_frame_path(train_config: json):
     """
     It checks if we have a file
@@ -42,8 +45,17 @@ def extract_station_offsets(train_config: json):
     target_time_offsets = train_config["target_time_offsets"]
     return stations, target_time_offsets
 
-def plot_loss(loss_values):
-    plt.figure()
+def plot_loss(train_losses, eval_losses):
+    x = range(len(train_losses))
+    plt.figure(figsize=[12, 8])
+    plt.grid(color='grey', linestyle='-', linewidth=0.5)
+    plt.title("BERT evaluation loss and accuracy")
+    plt.plot(x, train_losses, label='train losses')
+    plt.plot(x, eval_losses, label='eval losses')
+    plt.legend(['train losses', 'eval losses'])
+    plt.xlabel('check points per 1000 steps')
+    plt.ylabel('losses')
+    plt.show()
 
 if __name__ == "__main__":
     print("Entering training python script.")
@@ -93,6 +105,8 @@ if __name__ == "__main__":
         stations, target_time_offsets, args.user_config)
     model = model_factory.build(args.model_name)
 
+    
+
     print("*******Create training dataset********")
     if not args.dont_use_cache:
         dataset = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
@@ -110,9 +124,14 @@ if __name__ == "__main__":
     is_training = args.training
     loss_fct = tf.keras.losses.MSE
 
+    model.compile(optimizer='adam',
+                  loss=loss_fct,
+                  metrics=['loss'])
+
+
     print("Model and dataset loaded, starting main training loop...!!")
 
-    logging.basicConfig(filename='/project/cq-training-1/project1/teams/team07/result.log',level=logging.DEBUG)
+    logging.basicConfig(filename='result.log',level=logging.DEBUG)
 
     # main loop
     for epoch in range(args.num_epochs):
@@ -127,8 +146,7 @@ if __name__ == "__main__":
             if count == 10:
                 # print(f"Data Fetch time: {time.perf_counter() - datafetch_time}, for batch size: {metas.shape[0]}")
                 count = 0
-                
-            
+
             with tf.GradientTape() as tape:
                 y_ = model(metas, images)
                 loss_value = loss_fct(y_true=targets, y_pred=y_)
