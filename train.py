@@ -16,6 +16,7 @@ import pdb
 import time
 import logging
 import pandas as pd
+import numpy as np
 
 from models.model_factory import ModelFactory
 from dataloader.dataset import TrainingDataSet
@@ -123,6 +124,7 @@ if __name__ == "__main__":
     train_accuracy_results = []
     is_training = args.training
     loss_fct = tf.keras.losses.MSE
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.00000001)
 
     model.compile(optimizer='adam',
                   loss=loss_fct,
@@ -138,27 +140,32 @@ if __name__ == "__main__":
         datafetch_time = time.perf_counter()
         epoch_loss_avg = tf.keras.metrics.Mean()
         start_time = time.perf_counter()
-        count = 0
 
         print("*******EPOCH %d start********" % (epoch+1))
 
         for iter_idx, (metas, images, targets) in enumerate(dataset):
-            if count == 10:
-                # print(f"Data Fetch time: {time.perf_counter() - datafetch_time}, for batch size: {metas.shape[0]}")
-                count = 0
 
             with tf.GradientTape() as tape:
-                y_ = model(metas, images)
+                images = tf.keras.utils.normalize(images,axis=-1)
+
+                y_ = model(metas, images, training=True)
                 loss_value = loss_fct(y_true=targets, y_pred=y_)
                 if iter_idx % 9 == 0:
-                    print("********predicted value")
-                    print(y_)
+                    # print("********predicted value")
+                    # print(y_)
                     print(f"Batch loss: {loss_value}")
                 
+                print(f"Batch loss {iter_idx}: {np.mean(loss_value)}")
+                #print(f"Batch loss: {loss_value}")
+
+            grads = tape.gradient(loss_value, model.trainable_variables)
+            optimizer.apply_gradients(zip(grads, model.trainable_variables))
+
             # Track progress
             epoch_loss_avg(loss_value)  # Add current batch loss
-            count += 1
-            if count == 10:
+            if iter_idx % 9 == 0:
+                print(
+                    f"Data Fetch time: {time.perf_counter() - datafetch_time}, for batch size: {metas.shape[0]}")
                 datafetch_time = time.perf_counter()
 
             if iter_idx % 9 == 0:

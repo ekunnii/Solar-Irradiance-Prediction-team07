@@ -24,6 +24,5 @@ pip install --no-index tqdm
 
 echo ""
 echo "Calling python train script."
-stdbuf -oL python -u ./train.py $PWD"/train_config.json" -n 1 -m "CNN2D" --train True --scratch_dir $SCRATCH --use_cache False
+stdbuf -oL python -u ./train.py $PWD"/train_config.json" -n 1 -m "CNN2D" --train True --scratch_dir $SCRATCH
 stdbuf -oL python -u ./test.py
-

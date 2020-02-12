@@ -48,7 +48,6 @@ def get_image_transformed(h5_data: h5py.File, channels, image_time_offset_idx: i
         raw_img = utils.fetch_hdf5_sample(channel, h5_data, image_time_offset_idx)
         if raw_img is None or raw_img.shape != (650, 1500):
             return None
-        
         try:
             array_cropped = utils.crop(copy.deepcopy(raw_img), station_pixel_coords, cropped_img_size)
         except:
@@ -89,7 +88,7 @@ def BuildDataSet(
                 date = hdf5_path.split(b"/")[-1].split(b".")
                 dataframe_day = dataframe.iloc[(dataframe.index.year == int(date[0])) & (dataframe.index.month == int(date[1])) & (dataframe.index.day == int(date[2]))]
                 assert dataframe_day.shape, f"No dataframe for {date}"
-                
+
                 for date_index, row in dataframe_day.iterrows():
                     # get h5 meta info
                     global_start_idx = h5_data.attrs["global_dataframe_start_idx"]
@@ -130,11 +129,54 @@ def BuildDataSet(
                             # remove negative value
                             if (t_0 + offset) in dataframe.index:
                                 station_ghis.append(round(max(dataframe.loc[t_0 + offset][station_idx + "_GHI"],0),2))
+                                if np.isnan(dataframe.loc[t_0 + offset][station_idx + "_GHI"]):
+                                    station_ghis.append(
+                                        round(max(dataframe.loc[t_0 + offset][station_idx + "_CLEARSKY_GHI"], 0), 2))
                             else:
                                 station_ghis.append(0.0)
 
                         if debug:
                             print(f"Returning data for {hdf5_path}")
+
+                            
+
+                                # ##DEBUG
+                                # # Try to extrapolate with close available ghi when possible and clearsky when its not
+                                # # However, ghi seems to be always unavailable in big gaps.
+                                # # So changed it so it's always using clearsky
+
+                                # offset_15min = pd.Timedelta("P0DT0H15M0S", ).to_pytimedelta()
+                                # ghi_just_before = dataframe.loc[t_0 + offset - offset_15min][station_idx + "_GHI"]
+                                # ghi_just_after = dataframe.loc[t_0 + offset + offset_15min][station_idx + "_GHI"]
+                                # if np.isnan(ghi_just_before) or np.isnan(ghi_just_after):
+                                #     ghi_just_before = dataframe.loc[t_0 + offset - (offset_15min*2)][station_idx + "_GHI"]
+                                #     ghi_just_after = dataframe.loc[t_0 + offset + (offset_15min*2)][station_idx + "_GHI"]
+                                # # ghi is not available for a gap of time, then use clearsky
+                                # if np.isnan(ghi_just_before) or np.isnan(ghi_just_after):
+                                #     print('clearsky', station_idx,dataframe.loc[t_0 + offset][station_idx + "_GHI"], ghi_just_before, ghi_just_after, dataframe.loc[t_0 + offset][station_idx + "_CLEARSKY_GHI"])
+                                #     station_ghis.append(
+                                #         round(max(dataframe.loc[t_0 + offset][station_idx + "_CLEARSKY_GHI"], 0), 2))
+                                # else:
+                                #     print('extrapolate',station_idx,dataframe.loc[t_0 + offset][station_idx + "_GHI"], ghi_just_before, ghi_just_after, (ghi_just_before+ghi_just_after)/2)
+                                #     station_ghis.append(
+                                #         round(max((ghi_just_before+ghi_just_before)/2, 0), 2))
+                                # ##DEBUG
+                            else:
+                                # ##DEBUG
+                                # jump_day = pd.Timedelta("P1DT0H0M0S", ).to_pytimedelta()
+                                # if (t_0 + offset - jump_day) in dataframe.index and (t_0 + offset + jump_day) in dataframe.index :
+                                #     day_before = dataframe.loc[t_0 + offset - jump_day][station_idx + "_GHI"]
+                                #     day_after = dataframe.loc[t_0 + offset + jump_day][station_idx + "_GHI"]
+                                #
+                                #     offset_15min = pd.Timedelta("P0DT0H15M0S", ).to_pytimedelta()
+                                #     ghi_just_before = dataframe.loc[t_0 + offset - offset_15min][station_idx + "_GHI"]
+                                #     ghi_just_after = dataframe.loc[t_0 + offset + offset_15min][station_idx + "_GHI"]
+                                #     print('ghi',station_idx,dataframe.loc[t_0 + offset][station_idx + "_GHI"], 'clearsky', dataframe.loc[t_0 + offset][station_idx + "_CLEARSKY_GHI"], 'days ext', (day_before+day_after)/2, 'neighbor extr', (ghi_just_before+ghi_just_after)/2)
+                                # ##DEBUG
+
+                                # change negative ghi to 0 and round it
+                                station_ghis.append(round(max(dataframe.loc[t_0 + offset][station_idx + "_GHI"],0),2))
+
                         yield (meta_array, image_data, station_ghis)
 
                 #pdb.set_trace()
