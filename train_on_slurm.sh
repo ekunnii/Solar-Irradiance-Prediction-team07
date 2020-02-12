@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --time=60:00
 #SBATCH --gres=gpu:k80:1
-#SBATCH --cpus-per-task=2
+#SBATCH --cpus-per-task=4
 #SBATCH --mem=10000M
 
 module load python/3.7
@@ -22,6 +22,10 @@ pip install --no-index tqdm
 # which pip
 # pip freeze
 
-python ./train.py $PWD"/train_config.json" -n 1 -m "CNN2D" --train True --scratch_dir $SCRATCH --use_cache False
-python ./test.py
+# python ./train.py $PWD"/train_config.json" -n 1 -m "CNN2D" --train True --scratch_dir $SCRATCH --dont_use_cache
+# python ./test.py
 
+echo ""
+echo "Calling python train script."
+stdbuf -oL python -u ./train.py $PWD"/train_config.json" -n 1 -m "CNN2D" --train True --scratch_dir $SCRATCH
+stdbuf -oL python -u ./test.py

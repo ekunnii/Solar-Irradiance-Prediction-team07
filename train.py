@@ -106,11 +106,14 @@ if __name__ == "__main__":
         datafetch_time = time.perf_counter()
         epoch_loss_avg = tf.keras.metrics.Mean()
         start_time = time.perf_counter()
+        count = 0
 
         print("*******EPOCH %d start********" % (epoch+1))
         iteration = 0
         for metas, images, targets in dataset:
-            print(f"Data Fetch time: {time.perf_counter() - datafetch_time}, for batch size: {metas.shape[0]}")
+
+            if iteration % 10 == 10:
+                print(f"Data Fetch time: {time.perf_counter() - datafetch_time}, for batch size: {metas.shape[0]}")
 
             with tf.GradientTape() as tape:
                 y_ = model(metas, images)
@@ -119,9 +122,11 @@ if __name__ == "__main__":
 
             # Track progress
             epoch_loss_avg(loss_value)  # Add current batch loss
-            datafetch_time = time.perf_counter()
-
             iteration += 1
+            if iteration % 10 == 0:
+                datafetch_time = time.perf_counter()
+
+
             if iteration % 999 ==0:
                 print("epoch : %d , iter: %d,  epoch loss:" % epoch + 1, iteration + 1, epoch_loss_avg.result())
 

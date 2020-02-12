@@ -48,7 +48,11 @@ def get_image_transformed(h5_data: h5py.File, channels, image_time_offset_idx: i
         if raw_img is None or raw_img.shape != (650, 1500):
             return None
 
-        array_cropped = utils.crop(copy.deepcopy(raw_img), station_pixel_coords, cropped_img_size)
+        try:
+            array_cropped = utils.crop(copy.deepcopy(raw_img), station_pixel_coords, cropped_img_size)
+        except:
+            return None
+
         # raw_data[array_idx, station_idx, channel_idx, ...] = cv.flip(array_cropped, 0) # TODO why the flip??
 
         #array = (((array.astype(np.float32) - norm_min) / (norm_max - norm_min)) * 255).astype(np.uint8) # TODO norm?
@@ -73,6 +77,7 @@ def BuildDataSet(
     image_dim = user_config and user_config["image_dim"] or (64, 64)
     output_seq_len = user_config and user_config["output_seq_len"] or 4
     channels = user_config and user_config["target_channels"] or ["ch1", "ch2", "ch3", "ch4", "ch6"]
+    debug = user_config and user_config["debug"] or False
 
     def _train_dataset(hdf5_path):
         # Load image file
@@ -83,6 +88,8 @@ def BuildDataSet(
                 # get day time index from filename, and iterate through all the day
                 date = hdf5_path.split(b"/")[-1].split(b".")
                 dataframe_day = dataframe.iloc[(dataframe.index.year == int(date[0])) & (dataframe.index.month == int(date[1])) & (dataframe.index.day == int(date[2]))]
+                assert dataframe_day.shape, f"No dataframe for {date}"
+
                 for date_index, row in dataframe_day.iterrows():
                     # get h5 meta info
                     global_start_idx = h5_data.attrs["global_dataframe_start_idx"]
@@ -110,6 +117,8 @@ def BuildDataSet(
                         # Get image data
                         image_data = get_image_transformed(h5_data, channels, image_time_offset_idx, station_pixel_coords, image_dim[0])
                         if image_data is None:
+                            if debug:
+                                print("No croped image")
                             continue
 
                         # get station GHI targets
@@ -159,6 +168,12 @@ def BuildDataSet(
                                 station_ghis.append(round(max(dataframe.loc[t_0 + offset][station_idx + "_GHI"],0),2))
 
                         yield (meta_array, image_data, station_ghis)
+
+                #pdb.set_trace()
+                if debug:
+                    print(f"Not yielding any results! or done... {hdf5_path}")
+                #raise StopIteration
+                return
     # End of generator
 
     # ## debugging
@@ -172,12 +187,16 @@ def BuildDataSet(
 
     debug = False
     if debug == True:
-        dataframe = dataframe.loc["2011-12-1 08:00:00":"2011-12-02 07:45:00"] # single day data
+        dataframe = dataframe.loc["2010-01-1 08:00:00":"2010-04-30 07:45:00"] # single day data
 
     dataframe = dataframe.loc[admin_config["start_bound"] + ' 08:00:00':admin_config["end_bound"] + ' 08:00:00']
 
+    # first 3 months are empty, remove to iterate faster.
+    #dataframe = dataframe.loc["2010-04-13 08:00:00":]
+
     # Only get dataloaders for image files that exist.
-    image_files_to_process = dataframe[('hdf5_8bit_path')][(dataframe['hdf5_8bit_path'].str.contains('nan|NAN|NaN') == False)]
+    image_files_to_process = dataframe[('hdf5_8bit_path')][(dataframe['hdf5_8bit_path'].str.contains('nan|NAN|NaN') == False)].unique()
+
 
     # Create an interleaved dataset so it's faster. Each dataset is responsible to load it's own compressed image file.
     files = tf.data.Dataset.from_tensor_slices(image_files_to_process)
