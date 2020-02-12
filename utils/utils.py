@@ -824,7 +824,54 @@ def dummy_data_generator(data, batch_size=32):
             # Your dataloader should handle this accordingly.
             yield samples, targets
 
-
+def process_df(df,big_gap=6):
+    """
+    Big gap is calculated in number of hours but
+    code can easily be changed for days or weeks if necessary
+    Definition of classes still need to be done
+    Will need some modifications when the ratio is divided by 0 
+    or need to deal with this in class allocation
+    """
+    # Add ratio and flag that GHI exist
+    station = ['BND','TBL','DRA','FPK','GWN','PSU','SXF']
+    for stat in station:
+        df[f"Flag_T0_{stat}"]= 1 - df[f"{stat}_GHI"].isnull()
+        df[f"Ratio_GHI_{stat}"] = df[f"{z}_CLEARSKY_GHI"]/df[f"{z}_GHI"]
+    
+    # Add flag that the image at T0 exists
+    df['Flag_T0_image']= df['ncdf_path']!='nan'
+    
+    # Add counts of consecutive missing image paths
+    df['count_no_path'] = df.groupby((df['ncdf_path'] != df['ncdf_path'].shift(1)).cumsum()).cumcount()+1
+    
+    # Remove large gaps in dataframe
+    adjust = datetime.timedelta(minutes=-15)
+    gap_num = big_gap*4
+    gap_time = datetime.timedelta(hours=-(big_gap-.25))
+    pos_big_gap=df[df['count_no_path']==gap_num].index
+    for pos in pos_big_gap:
+        count = df['count_no_path'][l:]
+        end=count[count == 1].index[0]+adjust
+        start = pos+gap_time
+        to_drop = pd.date_range(start,end,freq='15min')
+        df=df[~df.index.isin(to_drop)]
+    
+    # Create flag for data availability
+    target = [0,1,3,6]
+    
+    for stat in station:
+        df[f"{stat}_data_avail"]=0
+        for goal in target:
+            goaltime = datetime.timedelta(hours=goal)
+            df[f"{stat}_data_avail"] += df[f"{stat}_GHI"][[df[f"{stat}_GHI"].index+datetime.timedelta(hours=1)].isnull()]
+        df[f"{stat}_data_avail"] += df['Flag_T0_image']==0
+        df[f"{stat}_data_avail"] = df[f"{stat}_data_avail"]==0
+        df[f"{stat}_data_avail_day"] = df[f"{stat}_data_avail"]*df[f"{stat}_DAYTIME"]
+    return df
+    
+            
+            
+            
 def convert_time(timestamp):
     """
     Take the hour/minute and month of the timestamp and convert them to a 
