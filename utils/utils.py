@@ -864,6 +864,7 @@ def process_df(df,big_gap=6):
         for goal in target:
             goaltime = datetime.timedelta(hours=goal)
             df[f"{stat}_data_avail"] += df[f"{stat}_GHI"][[df[f"{stat}_GHI"].index+datetime.timedelta(hours=1)].isnull()]
+        df[f"{stat}_data_avail"] += df['Flag_T0_image']==0
         df[f"{stat}_data_avail"] = df[f"{stat}_data_avail"]==0
         df[f"{stat}_data_avail_day"] = df[f"{stat}_data_avail"]*df[f"{stat}_DAYTIME"]
     return df
