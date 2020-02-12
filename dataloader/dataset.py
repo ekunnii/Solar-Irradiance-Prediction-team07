@@ -18,6 +18,7 @@ import datetime
 import pdb
 import h5py
 import copy
+import tqdm as tqdm
 
 def set_faster_path(original_file, scratch_dir):
     if scratch_dir == None or scratch_dir == "":
@@ -88,6 +89,7 @@ def BuildDataSet(
                     h5_size = global_end_idx - global_start_idx
                     global_start_time = datetime.datetime.strptime(h5_data.attrs["global_dataframe_start_time"], "%Y.%m.%d.%H%M")
                     image_time_offset_idx = (date_index - global_start_time) / datetime.timedelta(minutes=15)
+                    print("hdf5_path:", hdf5_path)
 
                     lats, lons = get_lats_lon(h5_data, h5_size)
                     if lats is None or lons is None:
@@ -190,6 +192,14 @@ class TrainingDataSet(tf.data.Dataset):
         fast_data_frame_path = set_faster_path(data_frame_path, scratch_dir)
 
         data_frame = pd.read_pickle(fast_data_frame_path)
+
+        if "start_bound" in admin_config:
+            data_frame = data_frame[data_frame.index >= datetime.datetime.fromisoformat(
+                admin_config["start_bound"])]
+        if "end_bound" in admin_config:
+            data_frame = data_frame[data_frame.index < datetime.datetime.fromisoformat(
+                admin_config["end_bound"])]
+
 
         # ## debug
         # # data_frame = data_frame[data_frame.index >= datetime.datetime.fromisoformat('2010-05-01 08:00:00')]
