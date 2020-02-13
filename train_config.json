@@ -1,7 +1,7 @@
 {
     "dataframe_path": "/project/cq-training-1/project1/data/catalog.helios.public.20100101-20160101.pkl",
     "relative_dataframe_path": "/data/catalog.helios.public.20100101-20160101_updated.pkl",
-    "start_bound": "2011-05-01 00:00:00",
+    "start_bound": "2011-05-01 08:00:00",
     "end_bound": "2011-05-20 23:45:00",
     "stations": {
       "BND": [40.05192, -88.37309, 230],
@@ -12,7 +12,7 @@
       "PSU": [40.72012, -77.93085, 376],
       "SXF": [43.73403, -96.62328, 473]
     },
-    "batch_size": 32,
+    "batch_size": 1,
     "target_time_offsets": [
       "P0DT0H0M0S",
       "P0DT1H0M0S",
