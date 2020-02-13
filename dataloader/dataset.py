@@ -116,11 +116,11 @@ def BuildDataSet(
 
                         # Get image data
                         image_data = get_image_transformed(h5_data, channels, image_time_offset_idx, station_pixel_coords, image_dim[0])
-                        image_data = image_data/255.0
                         if image_data is None:
                             if debug:
                                 print("No croped image")
                             continue
+                        image_data = image_data/255.0
 
                         # get station GHI targets
                         t_0 = row.name
@@ -181,22 +181,18 @@ def BuildDataSet(
 
                         yield (meta_array, image_data, station_ghis)
 
-                #pdb.set_trace()
                 if debug:
                     print(f"Not yielding any results! or done... {hdf5_path}")
-                #raise StopIteration
                 return
     # End of generator
 
     def wrap_generator(filename):
         return tf.data.Dataset.from_generator(_train_dataset, args=[filename], output_types=(tf.float64, tf.float64, tf.float64))
     
+     # single day data
     if debug == True:
-        dataframe = dataframe.loc["2010-01-1 08:00:00":"2010-04-30 07:45:00"] # single day data
+        dataframe = dataframe.loc["2010-01-1 08:00:00":"2010-04-30 07:45:00"]
 
-    # first 3 months are empty, remove to iterate faster. 
-    # dataframe = dataframe.loc["2010-04-13 08:00:00":]
-    
     # Only get dataloaders for image files that exist. 
     image_files_to_process = dataframe[('hdf5_8bit_path')] [(dataframe['hdf5_8bit_path'].str.contains('nan|NAN|NaN') == False)].unique()
     
@@ -230,43 +226,6 @@ class TrainingDataSet(tf.data.Dataset):
             data_frame = data_frame[data_frame.index <= datetime.datetime.fromisoformat(
                 admin_config["end_bound"])]
 
-
-        # ## debug
-        # data_frame = data_frame[data_frame.index >= datetime.datetime.fromisoformat('2010-05-01 13:45:00')]
-        # # data_frame = data_frame[data_frame.index >= datetime.datetime.fromisoformat('2010-05-04 01:15:00')]
-        # # print(data_frame["BND_GHI"].value_counts())
-        # # print(data_frame["BND_GHI"].describe())
-        # # print(data_frame["TBL_GHI"].isna().sum())
-        # # t = ["BND","TBL","DRA","FPK","GWN","PSU", "SXF"]
-        # # for e in t:
-        # #     data_frame = data_frame.drop(t + "_GHI",1)
-        # print(data_frame.iloc[:,5:][pd.isna(data_frame.iloc[:,5:]).any(axis=1)].head())
-        # # print(np.isnan(data_frame.loc[datetime.datetime.fromisoformat('2010-05-01 14:15:00')]["PSU_GHI"]))
-        # ## debug
-
         target_time_offsets = [pd.Timedelta(d).to_pytimedelta() for d in admin_config["target_time_offsets"]]
-
         return BuildDataSet(data_frame, stations, target_time_offsets, admin_config, user_config)
 
-# ## debug
-# if __name__ == "__main__":
-#     pd.set_option('display.max_columns', None)  # or 1000
-#     pd.set_option('display.max_rows', None)  # or 1000
-#     pd.set_option('display.max_colwidth', None)  # or 199
-#
-#     dataframe_path = "../data/catalog.helios.public.20100101-20160101_updated.pkl"
-#     stations = {
-#         "BND": [40.05192, -88.37309, 230],
-#         "TBL": [40.12498, -105.23680, 1689],
-#         "DRA": [36.62373, -116.01947, 1007],
-#         "FPK": [48.30783, -105.10170, 634],
-#         "GWN": [34.25470, -89.87290, 98],
-#         "PSU": [40.72012, -77.93085, 376],
-#         "SXF": [43.73403, -96.62328, 473]
-#     }
-#     import json
-#     with open('../train_config.json', "r") as tc:
-#         admin_json = json.load(tc)
-#
-#     data = TrainingDataSet(dataframe_path, stations, admin_json)
-# ## debug

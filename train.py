@@ -118,7 +118,8 @@ if __name__ == "__main__":
     else:
         dataset = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
             .prefetch(tf.data.experimental.AUTOTUNE) \
-            .batch(batch_size)
+            .batch(batch_size) ##\
+            ##.shuffle(buffer_size)
 
     train_loss_results = []
     train_accuracy_results = []
@@ -130,20 +131,21 @@ if __name__ == "__main__":
                   loss=loss_fct,
                   metrics=['loss'])
 
-
-    print("Model and dataset loaded, starting main training loop...!!")
-
     logging.basicConfig(filename='result.log',level=logging.DEBUG)
 
     # main loop
     for epoch in range(args.num_epochs):
         datafetch_time = time.perf_counter()
+        datafetch_print = False
         epoch_loss_avg = tf.keras.metrics.Mean()
         start_time = time.perf_counter()
 
         print("*******EPOCH %d start********" % (epoch+1))
 
         for iter_idx, (metas, images, targets) in enumerate(dataset):
+            if datafetch_print:
+                datafetch_print = False
+                print(f"Data Fetch time: {time.perf_counter() - datafetch_time}, for batch size: {metas.shape[0]}")
 
             with tf.GradientTape() as tape:
                 images = tf.keras.utils.normalize(images,axis=-1)
@@ -151,12 +153,9 @@ if __name__ == "__main__":
                 y_ = model(metas, images, training=True)
                 loss_value = loss_fct(y_true=targets, y_pred=y_)
                 if iter_idx % 9 == 0:
-                    # print("********predicted value")
-                    # print(y_)
                     print(f"Batch loss: {loss_value}")
                 
                 print(f"Batch loss {iter_idx}: {np.mean(loss_value)}")
-                #print(f"Batch loss: {loss_value}")
 
             grads = tape.gradient(loss_value, model.trainable_variables)
             optimizer.apply_gradients(zip(grads, model.trainable_variables))
@@ -164,8 +163,7 @@ if __name__ == "__main__":
             # Track progress
             epoch_loss_avg(loss_value)  # Add current batch loss
             if iter_idx % 9 == 0:
-                print(
-                    f"Data Fetch time: {time.perf_counter() - datafetch_time}, for batch size: {metas.shape[0]}")
+                datafetch_print = True
                 datafetch_time = time.perf_counter()
 
             if iter_idx % 9 == 0:
