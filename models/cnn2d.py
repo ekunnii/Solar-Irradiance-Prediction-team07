@@ -14,7 +14,7 @@ class cnn2d(Model):
         self.maxpool = MaxPooling2D((2, 2))
         self.flatten = Flatten()
         self.d1 = Dense(64, activation='relu')
-        self.d2 = Dense(len(target_time_offsets), activation="linear")
+        self.d2 = Dense(len(target_time_offsets), activation="relu")
 
     def call(self, metas, images):
         assert not np.any(np.isnan(images))

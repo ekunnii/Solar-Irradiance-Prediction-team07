@@ -116,6 +116,7 @@ def BuildDataSet(
 
                         # Get image data
                         image_data = get_image_transformed(h5_data, channels, image_time_offset_idx, station_pixel_coords, image_dim[0])
+
                         if image_data is None:
                             if debug:
                                 print("No croped image")
@@ -128,12 +129,14 @@ def BuildDataSet(
                         last_available_ghi = 0
                         for offset in target_time_offsets:
                             # remove negative value
-                            if (t_0 + offset) in dataframe.index:
-                                station_ghis.append(round(max(dataframe.loc[t_0 + offset][station_idx + "_GHI"],0),2))
+                            if (t_0 + offset) in dataframe.index:            
                                 if np.isnan(dataframe.loc[t_0 + offset][station_idx + "_GHI"]):
                                     station_ghis.append(
                                         round(max(dataframe.loc[t_0 + offset][station_idx + "_CLEARSKY_GHI"], 0), 2))
-                                    last_available_ghi = station_ghis[-1]
+                                else:
+                                    station_ghis.append(
+                                        round(max(dataframe.loc[t_0 + offset][station_idx + "_GHI"], 0), 2))
+                                last_available_ghi = station_ghis[-1]
                             else:
                                 station_ghis.append(last_available_ghi)
 
