@@ -97,7 +97,7 @@ if __name__ == "__main__":
     train_accuracy_results = []
     is_training = args.training
     loss_fct = tf.keras.losses.MSE
-    optimizer = tf.keras.optimizers.Adam(learning_rate=0.00000001)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.00005)
 
     print("Model and dataset loaded, starting main training loop...!!")
 
@@ -111,20 +111,21 @@ if __name__ == "__main__":
         start_time = time.perf_counter()
         count = 0
 
-        print("*******EPOCH %d start********" % (epoch+1))
+        # print("*******EPOCH %d start********" % (epoch+1))
         iteration = 0
         for metas, images, targets in dataset:
 
             if iteration % 10 == 10:
                 print(f"Data Fetch time: {time.perf_counter() - datafetch_time}, for batch size: {metas.shape[0]}")
 
+            images = tf.keras.utils.normalize(images, axis=-1)
             with tf.GradientTape() as tape:
-                images = tf.keras.utils.normalize(images,axis=-1)
-
+                # tape.watch(images)
                 y_ = model(metas, images, training=True)
                 loss_value = loss_fct(y_true=targets, y_pred=y_)
-                print(f"Batch loss {iteration}: {np.mean(loss_value)}")
-                #print(f"Batch loss: {loss_value}")
+            # print(f"Batch loss {iteration}: {np.mean(loss_value)}")
+            print(np.mean(loss_value))
+            #print(f"Batch loss: {loss_value}")
 
             grads = tape.gradient(loss_value, model.trainable_variables)
             optimizer.apply_gradients(zip(grads, model.trainable_variables))
@@ -142,5 +143,5 @@ if __name__ == "__main__":
         # End epoch
         train_loss_results.append(epoch_loss_avg.result())
         logging.debug(train_loss_results)
-        print(f"Epoch result: {epoch_loss_avg.result()}")
-        print(f"Elapsed time for epoch: {time.perf_counter() - start_time}")
+        # print(f"Epoch result: {epoch_loss_avg.result()}")
+        # print(f"Elapsed time for epoch: {time.perf_counter() - start_time}")
