@@ -177,7 +177,7 @@ if __name__ == "__main__":
                         help="Enable dataloader cache or not")
     parser.add_argument("--delete_checkpoints", type=bool, default=False,
                         help="Delete previous checkpoints or not, by default is False")
-    parser.add_argument("--load_checkpoints", type=bool, default=True,
+    parser.add_argument("--load_checkpoints", type=bool, default=False,
                         help="load previous checkpoints or not, by default is True")
 
     args = parser.parse_args()
@@ -227,7 +227,7 @@ if __name__ == "__main__":
     is_training = args.training
     compute_loss = tf.keras.losses.MSE
     # optimizer = tf.keras.optimizers.Adam(learning_rate=0.00000001)
-    optimizer = optimizers.SGD(learning_rate=0.01, momentum=0.5)
+    optimizer = optimizers.SGD(learning_rate=0.001, momentum=0.5)
     # compute_accuracy = tf.keras.metrics.SparseCategoricalAccuracy()
 
 
