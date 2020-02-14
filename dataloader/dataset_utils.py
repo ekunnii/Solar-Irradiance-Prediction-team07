@@ -9,9 +9,15 @@ import pdb
 import numpy as np
 import copy
 
-def valid_t0_row(row):
-    if row:
-        pass
+def valid_t0_row(row, station):
+    if pd.isnull(row[f"{station}_GHI"]):
+        #print("No GHI")
+        return False
+    if not row[f"{station}_DAYTIME"]:
+        #print("Not Day")
+        return False
+    return True
+    
 
 def set_faster_path(original_file, scratch_dir):
     if scratch_dir == None or scratch_dir == "":

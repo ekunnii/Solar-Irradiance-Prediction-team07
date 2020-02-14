@@ -48,9 +48,6 @@ def BuildDataSet(
             with h5py.File(hdf5_path, "r") as h5_data:
 
                 for row_date, row in dataframe_day.iterrows():
-                    if not du.valid_t0_row(row):
-                        continue
-                    
                     # get h5 meta info
                     global_start_idx = h5_data.attrs["global_dataframe_start_idx"]
                     global_end_idx = h5_data.attrs["global_dataframe_end_idx"]
@@ -62,6 +59,11 @@ def BuildDataSet(
 
                     # Return one station at a time
                     for station_idx, coords in stations.items():
+                        if not du.valid_t0_row(row, station_idx):
+                            if debug:
+                                print(f"Not a valid t0: {row_date}, {station_idx}")
+                            continue
+
                         # get station specefic data / meta we want
                         station_pixel_coords = (np.argmin(np.abs(lats - coords[0])), np.argmin(np.abs(lons - coords[1])))
 
