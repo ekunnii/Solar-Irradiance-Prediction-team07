@@ -225,7 +225,8 @@ if __name__ == "__main__":
     else:
         train_ds = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
             .prefetch(tf.data.experimental.AUTOTUNE) \
-            .batch(batch_size)
+            .batch(batch_size) ##\
+            ##.shuffle(buffer_size)
 
     train_loss_results = []
     train_accuracy_results = []
@@ -235,9 +236,6 @@ if __name__ == "__main__":
     # optimizer = optimizers.SGD(learning_rate=0.01, momentum=0.5)
     # compute_accuracy = tf.keras.metrics.SparseCategoricalAccuracy()
 
-
-
-    print("Model and dataset loaded, starting main training loop...!!")
 
     logging.basicConfig(filename='result.log',level=logging.DEBUG)
 
