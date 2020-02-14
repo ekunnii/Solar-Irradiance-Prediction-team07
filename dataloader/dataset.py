@@ -90,10 +90,12 @@ def BuildDataSet(
                         for offset in target_time_offsets:
                             # remove negative value
                             if (t_0 + offset) in dataframe.index:
-                                station_ghis.append(round(max(dataframe.loc[t_0 + offset][station_idx + "_GHI"],0),2))
                                 if np.isnan(dataframe.loc[t_0 + offset][station_idx + "_GHI"]):
                                     station_ghis.append(
                                         round(max(dataframe.loc[t_0 + offset][station_idx + "_CLEARSKY_GHI"], 0), 2))
+                                else:
+                                    station_ghis.append(
+                                        round(max(dataframe.loc[t_0 + offset][station_idx + "_GHI"], 0), 2))
                                     last_available_ghi = station_ghis[-1]
                             else:
                                 station_ghis.append(last_available_ghi)
