@@ -836,7 +836,7 @@ def process_df(df,big_gap=6):
     station = ['BND','TBL','DRA','FPK','GWN','PSU','SXF']
     for stat in station:
         df[f"Flag_T0_{stat}"]= 1 - df[f"{stat}_GHI"].isnull()
-        df[f"Ratio_GHI_{stat}"] = df[f"{z}_CLEARSKY_GHI"]/df[f"{z}_GHI"]
+        df[f"Ratio_GHI_{stat}"] = df[f"{stat}_CLEARSKY_GHI"]/df[f"{stat}_GHI"]
     
     # Add flag that the image at T0 exists
     df['Flag_T0_image']= df['ncdf_path']!='nan'
@@ -850,7 +850,7 @@ def process_df(df,big_gap=6):
     gap_time = datetime.timedelta(hours=-(big_gap-.25))
     pos_big_gap=df[df['count_no_path']==gap_num].index
     for pos in pos_big_gap:
-        count = df['count_no_path'][l:]
+        count = df['count_no_path'][pos:]
         end=count[count == 1].index[0]+adjust
         start = pos+gap_time
         to_drop = pd.date_range(start,end,freq='15min')
@@ -863,12 +863,10 @@ def process_df(df,big_gap=6):
         df[f"{stat}_data_avail"]=0
         for goal in target:
             goaltime = datetime.timedelta(hours=goal)
-            df[f"{stat}_data_avail"] += df[f"{stat}_GHI"][[df[f"{stat}_GHI"].index+datetime.timedelta(hours=1)].isnull()]
-        df[f"{stat}_data_avail"] += df['Flag_T0_image']==0
+            df[f"{stat}_data_avail"] += df[f"{stat}_GHI"][df[f"{stat}_GHI"].index+goaltime].isnull()
         df[f"{stat}_data_avail"] = df[f"{stat}_data_avail"]==0
         df[f"{stat}_data_avail_day"] = df[f"{stat}_data_avail"]*df[f"{stat}_DAYTIME"]
-    return df
-    
+    return df    
             
             
             
