@@ -112,7 +112,7 @@ def BuildDataSet(
 
     # Only get dataloaders for image files that exist. 
     image_files_to_process = dataframe[('hdf5_8bit_path')] [(dataframe['hdf5_8bit_path'].str.contains('nan|NAN|NaN') == False)].unique()
-    
+
     # Create an interleaved dataset so it's faster. Each dataset is responsible to load it's own compressed image file.
     files = tf.data.Dataset.from_tensor_slices(image_files_to_process)
     dataset = files.interleave(wrap_generator, num_parallel_calls=tf.data.experimental.AUTOTUNE)
@@ -138,10 +138,10 @@ class TrainingDataSet(tf.data.Dataset):
 
         if "start_bound" in admin_config:
             data_frame = data_frame[data_frame.index >= datetime.datetime.fromisoformat(
-                admin_config["start_bound"])]
+                admin_config["start_bound"] + ' 08:00:00')]
         if "end_bound" in admin_config:
             data_frame = data_frame[data_frame.index <= datetime.datetime.fromisoformat(
-                admin_config["end_bound"])]
+                admin_config["end_bound"] + ' 07:45:00')]
 
         target_time_offsets = [pd.Timedelta(d).to_pytimedelta() for d in admin_config["target_time_offsets"]]
         return BuildDataSet(data_frame, stations, target_time_offsets, admin_config, user_config)

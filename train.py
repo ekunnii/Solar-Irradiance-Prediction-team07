@@ -96,13 +96,14 @@ def solar_datasets(datasets):
     return train_ds, eval_ds
 
 def train_step(model, optimizer, meta_data, images, labels):
+    images = tf.keras.utils.normalize(images, axis=-1)
 
     # Record the operations used to compute the loss, so that the gradient
     # of the loss with respect to the variables can be computed.
     with tf.GradientTape() as tape:
-        logits = model(meta_data, images, training=True)
-        loss = compute_loss(labels, logits)
-        # compute_accuracy(labels, logits)
+        y_pred = model(meta_data, images, training=True)
+        loss = compute_loss(labels, y_pred)
+        print('pred', np.mean(y_pred, axis=0), 'label:', np.mean(labels, axis=0), 'nb prediction 0:', y_pred.shape[0]*y_pred.shape[1] -  np.sum(y_pred <= 1))
 
     grads = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
@@ -124,13 +125,14 @@ def train(model, optimizer, dataset, log_freq=50):
         avg_loss(loss)
 
         if tf.equal(optimizer.iterations % log_freq, 0):
-            print("first sample from batch", images[0], labels[0])
+            # print("first sample from batch", images[0], labels[0])
             # summary_ops_v2.scalar('loss', avg_loss.result(), step=optimizer.iterations)
             # summary_ops_v2.scalar('accuracy', compute_accuracy.result(), step=optimizer.iterations)
             print('step:', int(optimizer.iterations),
                   'loss:', avg_loss.result().numpy(),
                   'RMSE:', np.sqrt(avg_loss.result().numpy()))
-            avg_loss.reset_states()
+            logging.debug(np.sqrt(avg_loss.result().numpy()))
+        avg_loss.reset_states()
             # compute_accuracy.reset_states()
 
 
@@ -141,7 +143,7 @@ def test(model, dataset, step_num):
     avg_loss = metrics.Mean('loss', dtype=tf.float32)
 
     for (meta_data, images, labels) in dataset:
-        logits = model(metas_data, images, training=False)
+        logits = model(meta_data, images, training=False)
         avg_loss(compute_loss(labels, logits))
         # compute_accuracy(labels, logits)
 
@@ -219,19 +221,20 @@ if __name__ == "__main__":
     else:
         train_ds = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
             .prefetch(tf.data.experimental.AUTOTUNE) \
-            .batch(batch_size) ##\
-            ##.shuffle(buffer_size)
+            .batch(batch_size) \
+            .shuffle(buffer_size)
 
     train_loss_results = []
     train_accuracy_results = []
     is_training = args.training
     # loss_fct = tf.keras.losses.MSE
-    optimizer = tf.keras.optimizers.Adam(learning_rate=0.00005)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.00003)
 
     compute_loss = tf.keras.losses.MSE
     # optimizer = optimizers.SGD(learning_rate=0.01, momentum=0.5)
 
     logging.basicConfig(filename='result.log',level=logging.DEBUG)
+    logging.debug("********New run**************")
 
     # Where to save checkpoints, tensorboard summaries, etc.
     checkpoint_dir = os.path.join(args.model_dir, 'checkpoints')
@@ -246,20 +249,19 @@ if __name__ == "__main__":
     # Restore variables on creation if a checkpoint exists.
     if args.load_checkpoints:
         checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
-
     for i in range(args.num_epochs):
         start = time.time()
         #   with train_summary_writer.as_default():
-        train(model, optimizer, train_ds, log_freq=5)
+        train(model, optimizer, train_ds, log_freq=1)
         end = time.time()
-        print('Train time for epoch #{} ({} total steps): {}'.format(
-            i + 1, int(optimizer.iterations), end - start))
+        # print('Train time for epoch #{} ({} total steps): {}'.format(
+        #     i + 1, int(optimizer.iterations), end - start))
 
         # with test_summary_writer.as_default():
         #     test(model, test_ds, optimizer.iterations)
 
         checkpoint.save(checkpoint_prefix)
-        print('saved checkpoint.')
+        #print('saved checkpoint.')
 
     # export_path = os.path.join(MODEL_DIR, 'export')
     # tf.saved_model.save(model, export_path)
