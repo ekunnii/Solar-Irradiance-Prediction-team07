@@ -115,7 +115,7 @@ def BuildDataSet(
     
     # Create an interleaved dataset so it's faster. Each dataset is responsible to load it's own compressed image file.
     files = tf.data.Dataset.from_tensor_slices(image_files_to_process)
-    dataset = files.interleave(wrap_generator, num_parallel_calls=1)
+    dataset = files.interleave(wrap_generator, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     return dataset
 
