@@ -9,4 +9,6 @@ data
 __pycache__
 .venv
 env
+*.log
+checkpoints
 

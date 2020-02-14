@@ -1,4 +1,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
+from tensorflow.keras import datasets, layers, models, optimizers, metrics
+from tensorflow import keras
+from tensorflow.python.ops import summary_ops_v2
 
 import argparse
 import datetime
@@ -6,6 +9,12 @@ import typing
 import json
 import os
 import tensorflow as tf
+import logging
+import pdb
+import time
+import pandas as pd
+
+import matplotlib.pyplot as plt
 import pdb
 import time
 import logging
@@ -15,6 +24,13 @@ import numpy as np
 from models.model_factory import ModelFactory
 from dataloader.dataset import TrainingDataSet
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
+
+"""
+train loop credit to https://github.com/dragen1860/TensorFlow-2.x-Tutorials/blob/master/01-TF2.0-Overview/conv_train.py
+"""
+
+tf.keras.backend.set_floatx('float64')
 
 def extract_data_frame_path(train_config: json):
     """
@@ -29,11 +45,113 @@ def extract_data_frame_path(train_config: json):
 
     assert True, f"Unable to find training data frame file from: {path} or from {train_config.dataframe_path}"
 
+
 def extract_station_offsets(train_config: json):
     stations = train_config["stations"]
     target_time_offsets = train_config["target_time_offsets"]
     return stations, target_time_offsets
 
+def plot_loss(train_losses, eval_losses):
+    x = range(len(train_losses))
+    plt.figure(figsize=[12, 8])
+    plt.grid(color='grey', linestyle='-', linewidth=0.5)
+    plt.title("Solar train and eval losses")
+    plt.plot(x, train_losses, label='train losses')
+    plt.plot(x, eval_losses, label='eval losses')
+    plt.legend(['train losses', 'eval losses'])
+    plt.xlabel('check points per 1000 steps')
+    plt.ylabel('losses')
+    plt.show()
+
+
+def apply_clean(dirname):
+    """delete directory
+
+    Arguments:
+        dirname {[type]} -- [description]
+    """
+    if tf.io.gfile.exists(dirname):
+        print('Removing existing dir: {}'.format(dirname))
+        tf.io.gfile.rmtree(dirname)
+
+def solar_datasets(datasets):
+    """
+    train and eaval split
+
+    """
+    print("*******Create training dataset********")
+    if not args.dont_use_cache:
+        train_ds = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
+            .prefetch(tf.data.experimental.AUTOTUNE) \
+            .batch(batch_size) \
+            .cache(cache_dir + "/tf_learn_cache") \
+            .shuffle(buffer_size)
+    else:
+        train_ds = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
+            .prefetch(tf.data.experimental.AUTOTUNE) \
+            .batch(batch_size)
+
+    eval_ds = train_ds
+
+    return train_ds, eval_ds
+
+def train_step(model, optimizer, meta_data, images, labels):
+
+    # Record the operations used to compute the loss, so that the gradient
+    # of the loss with respect to the variables can be computed.
+    with tf.GradientTape() as tape:
+        logits = model(meta_data, images, training=True)
+        loss = compute_loss(labels, logits)
+        # compute_accuracy(labels, logits)
+
+    grads = tape.gradient(loss, model.trainable_variables)
+    optimizer.apply_gradients(zip(grads, model.trainable_variables))
+
+    return loss
+
+
+def train(model, optimizer, dataset, log_freq=50):
+    """
+    Trains model on `dataset` using `optimizer`.
+    """
+    # Metrics are stateful. They accumulate values and return a cumulative
+    # result when you call .result(). Clear accumulated values with .reset_states()
+    avg_loss = metrics.Mean('loss', dtype=tf.float32)
+
+    # Datasets can be iterated over like any other Python iterable.
+    for (meta_data, images, labels) in dataset:
+        loss = train_step(model, optimizer, meta_data, images, labels)
+        avg_loss(loss)
+
+        if tf.equal(optimizer.iterations % log_freq, 0):
+            print("first sample from batch", images[0], labels[0])
+            # summary_ops_v2.scalar('loss', avg_loss.result(), step=optimizer.iterations)
+            # summary_ops_v2.scalar('accuracy', compute_accuracy.result(), step=optimizer.iterations)
+            print('step:', int(optimizer.iterations),
+                  'loss:', avg_loss.result().numpy(),
+                  'RMSE:', np.sqrt(avg_loss.result().numpy()))
+            avg_loss.reset_states()
+            # compute_accuracy.reset_states()
+
+
+def test(model, dataset, step_num):
+    """
+    Perform an evaluation of `model` on the examples from `dataset`.
+    """
+    avg_loss = metrics.Mean('loss', dtype=tf.float32)
+
+    for (meta_data, images, labels) in dataset:
+        logits = model(metas_data, images, training=False)
+        avg_loss(compute_loss(labels, logits))
+        # compute_accuracy(labels, logits)
+
+    print('Model test set loss: {:0.4f} RMSE: {:0.2f}%'.format(
+        avg_loss.result(), np.sqrt(avg_loss.result().numpy())))
+
+    print('loss:', avg_loss.result(), 'RMSE:',
+          np.sqrt(avg_loss.result().numpy()))
+    # summary_ops_v2.scalar('loss', avg_loss.result(), step=step_num)
+    # summary_ops_v2.scalar('accuracy', compute_accuracy.result(), step=step_num)
 
 if __name__ == "__main__":
     print("Entering training python script.")
@@ -51,17 +169,24 @@ if __name__ == "__main__":
                         help="Path to the JSON config file used to store user model/dataloader parameters")
     parser.add_argument("-s", "--scratch_dir", type=str, default=None,
                         help="Important for performance on the cluster!! If you want the files to be read fast, please set this variable.")
+    parser.add_argument("--model_dir", type=str, default="./models",
+                        help="Directory to save the checkpoints")
     parser.add_argument("--training", type=bool, default=True,
                         help="Enable training or not")
-    parser.add_argument("--dont_use_cache", dest='dont_use_cache', action='store_true',
-                        help="Add this flag if you don't want to use dataset cache")
+    parser.add_argument("--use_cache", type=bool, default=True,
+                        help="Enable dataloader cache or not")
+    parser.add_argument("--delete_checkpoints", type=bool, default=False,
+                        help="Delete previous checkpoints or not, by default is False")
+    parser.add_argument("--load_checkpoints", type=bool, default=True,
+                        help="load previous checkpoints or not, by default is True")
 
     args = parser.parse_args()
 
     print("Starting Training!")
 
     # Load configs
-    assert os.path.isfile(args.train_config), f"Invalid training configuration file: {args.train_config}"
+    assert os.path.isfile(
+        args.train_config), f"Invalid training configuration file: {args.train_config}"
     with open(args.train_config, "r") as tc:
         train_json = json.load(tc)
 
@@ -78,70 +203,64 @@ if __name__ == "__main__":
 
     # Init models, dataset and other vars for the training loop
     print("*******Create Model********")
-    model_factory = ModelFactory(stations, target_time_offsets, args.user_config)
+    model_factory = ModelFactory(
+        stations, target_time_offsets, args.user_config)
     model = model_factory.build(args.model_name)
 
+
+
     print("*******Create training dataset********")
-    if not args.dont_use_cache:
-        dataset = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
+    if args.use_cache:
+        train_ds = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
             .prefetch(tf.data.experimental.AUTOTUNE) \
             .batch(batch_size) \
             .cache(cache_dir + "/tf_learn_cache") \
             .shuffle(buffer_size)
     else:
-        dataset = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
-        .prefetch(tf.data.experimental.AUTOTUNE) \
-        .batch(batch_size)
+        train_ds = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
+            .prefetch(tf.data.experimental.AUTOTUNE) \
+            .batch(batch_size) ##\
+            ##.shuffle(buffer_size)
 
     train_loss_results = []
     train_accuracy_results = []
     is_training = args.training
-    loss_fct = tf.keras.losses.MSE
+    # loss_fct = tf.keras.losses.MSE
     optimizer = tf.keras.optimizers.Adam(learning_rate=0.00005)
 
-    print("Model and dataset loaded, starting main training loop...!!")
+    compute_loss = tf.keras.losses.MSE
+    # optimizer = optimizers.SGD(learning_rate=0.01, momentum=0.5)
 
-    #logging.basicConfig(filename='/project/cq-training-1/project1/teams/team07/result.log',level=logging.DEBUG)
-    logging.basicConfig(filename='result.log', level=logging.DEBUG)
+    logging.basicConfig(filename='result.log',level=logging.DEBUG)
 
-    # main loop
-    for epoch in range(args.num_epochs):
-        datafetch_time = time.perf_counter()
-        epoch_loss_avg = tf.keras.metrics.Mean()
-        start_time = time.perf_counter()
-        count = 0
+    # Where to save checkpoints, tensorboard summaries, etc.
+    checkpoint_dir = os.path.join(args.model_dir, 'checkpoints')
+    checkpoint_prefix = os.path.join(checkpoint_dir, 'ckpt')
 
-        # print("*******EPOCH %d start********" % (epoch+1))
-        iteration = 0
-        for metas, images, targets in dataset:
+    # clear previous checkpoints for debug purpose
+    if args.delete_checkpoints:
+        apply_clean(checkpoint_dir)
 
-            if iteration % 10 == 10:
-                print(f"Data Fetch time: {time.perf_counter() - datafetch_time}, for batch size: {metas.shape[0]}")
+    checkpoint = tf.train.Checkpoint(model=model, optimizer=optimizer)
 
-            images = tf.keras.utils.normalize(images, axis=-1)
-            with tf.GradientTape() as tape:
-                # tape.watch(images)
-                y_ = model(metas, images, training=True)
-                loss_value = loss_fct(y_true=targets, y_pred=y_)
-            # print(f"Batch loss {iteration}: {np.mean(loss_value)}")
-            print(np.mean(loss_value))
-            #print(f"Batch loss: {loss_value}")
+    # Restore variables on creation if a checkpoint exists.
+    if args.load_checkpoints:
+        checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
 
-            grads = tape.gradient(loss_value, model.trainable_variables)
-            optimizer.apply_gradients(zip(grads, model.trainable_variables))
+    for i in range(args.num_epochs):
+        start = time.time()
+        #   with train_summary_writer.as_default():
+        train(model, optimizer, train_ds, log_freq=5)
+        end = time.time()
+        print('Train time for epoch #{} ({} total steps): {}'.format(
+            i + 1, int(optimizer.iterations), end - start))
 
-            # Track progress
-            epoch_loss_avg(loss_value)  # Add current batch loss
-            iteration += 1
-            if iteration % 10 == 0:
-                datafetch_time = time.perf_counter()
+        # with test_summary_writer.as_default():
+        #     test(model, test_ds, optimizer.iterations)
 
+        checkpoint.save(checkpoint_prefix)
+        print('saved checkpoint.')
 
-            if iteration % 999 ==0:
-                print("epoch : %d , iter: %d,  epoch loss:" % epoch + 1, iteration + 1, epoch_loss_avg.result())
-
-        # End epoch
-        train_loss_results.append(epoch_loss_avg.result())
-        logging.debug(train_loss_results)
-        # print(f"Epoch result: {epoch_loss_avg.result()}")
-        # print(f"Elapsed time for epoch: {time.perf_counter() - start_time}")
+    # export_path = os.path.join(MODEL_DIR, 'export')
+    # tf.saved_model.save(model, export_path)
+    # print('saved SavedModel for exporting.')
