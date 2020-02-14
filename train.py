@@ -74,13 +74,12 @@ def apply_clean(dirname):
         print('Removing existing dir: {}'.format(dirname))
         tf.io.gfile.rmtree(dirname)
 
-def solar_datasets(datasets):
+def solar_datasets_split(datasets):
     """
     train and eaval split
 
     """    
-    print("*******Create training dataset********")
-    if not args.dont_use_cache:
+    if args.use_cache:
         train_ds = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
             .prefetch(tf.data.experimental.AUTOTUNE) \
             .batch(batch_size) \
@@ -104,33 +103,40 @@ def train_step(model, optimizer, meta_data, images, labels):
         loss = compute_loss(labels, logits)
         # compute_accuracy(labels, logits)
 
+
     grads = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
+
+    if tf.equal(optimizer.iterations % 5, 0):
+        print("first sample from batch", labels[0])
+        print(logits[0])  
 
     return loss
 
 
-def train(model, optimizer, dataset, log_freq=50):
+def train(model, optimizer, dataset, log_freq=500):
     """
     Trains model on `dataset` using `optimizer`.
     """
     # Metrics are stateful. They accumulate values and return a cumulative
     # result when you call .result(). Clear accumulated values with .reset_states()
-    avg_loss = metrics.Mean('loss', dtype=tf.float32)
+    avg_loss = metrics.Mean('loss', dtype=tf.float64)
 
     # Datasets can be iterated over like any other Python iterable.
     for (meta_data, images, labels) in dataset:
+        images = np.clip(images/255.0, a_min=0, a_max=255)
+        # labels = np.clip(labels/1000, a_min=0, a_max=5000)
         loss = train_step(model, optimizer, meta_data, images, labels)
         avg_loss(loss)
 
         if tf.equal(optimizer.iterations % log_freq, 0):
-            print("first sample from batch", images[0], labels[0])
+            
             # summary_ops_v2.scalar('loss', avg_loss.result(), step=optimizer.iterations)
             # summary_ops_v2.scalar('accuracy', compute_accuracy.result(), step=optimizer.iterations)
             print('step:', int(optimizer.iterations),
                   'loss:', avg_loss.result().numpy(),
                   'RMSE:', np.sqrt(avg_loss.result().numpy()))
-            avg_loss.reset_states()
+        avg_loss.reset_states()
             # compute_accuracy.reset_states()
 
 
@@ -177,8 +183,8 @@ if __name__ == "__main__":
                         help="Enable dataloader cache or not")
     parser.add_argument("--delete_checkpoints", type=bool, default=False,
                         help="Delete previous checkpoints or not, by default is False")
-    parser.add_argument("--load_checkpoints", type=bool, default=True,
-                        help="load previous checkpoints or not, by default is True")
+    parser.add_argument("--load_checkpoints", type=bool, default=False,
+                        help="load previous checkpoints or not, by default is False")
 
     args = parser.parse_args()
 
@@ -225,8 +231,8 @@ if __name__ == "__main__":
     train_accuracy_results = []
     is_training = args.training
     compute_loss = tf.keras.losses.MSE
-    # optimizer = tf.keras.optimizers.Adam(learning_rate=0.00000001)
-    optimizer = optimizers.SGD(learning_rate=0.01, momentum=0.5)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=5e-4)
+    # optimizer = optimizers.SGD(learning_rate=0.01, momentum=0.5)
     # compute_accuracy = tf.keras.metrics.SparseCategoricalAccuracy()
 
 
@@ -252,7 +258,7 @@ if __name__ == "__main__":
     for i in range(args.num_epochs):
         start = time.time()
         #   with train_summary_writer.as_default():
-        train(model, optimizer, train_ds, log_freq=5)
+        train(model, optimizer, train_ds, log_freq=50)
         end = time.time()
         print('Train time for epoch #{} ({} total steps): {}'.format(
             i + 1, int(optimizer.iterations), end - start))
@@ -262,51 +268,3 @@ if __name__ == "__main__":
 
         checkpoint.save(checkpoint_prefix)
         print('saved checkpoint.')
-
-    # export_path = os.path.join(MODEL_DIR, 'export')
-    # tf.saved_model.save(model, export_path)
-    # print('saved SavedModel for exporting.')
-
-
-    # # main loop
-    # for epoch in range(args.num_epochs):
-    #     datafetch_time = time.perf_counter()
-    #     epoch_loss_avg = tf.keras.metrics.Mean()
-    #     start_time = time.perf_counter()
-
-    #     print("*******EPOCH %d start********" % (epoch+1))
-
-    #     for iter_idx, (metas, images, targets) in enumerate(dataset):
-
-    #         with tf.GradientTape() as tape:
-    #             images = tf.keras.utils.normalize(images,axis=-1)
-
-    #             y_ = model(metas, images, training=True)
-    #             loss_value = loss_fct(y_true=targets, y_pred=y_)
-    #             if iter_idx % 9 == 0:
-    #                 # print("********predicted value")
-    #                 # print(y_)
-    #                 print(f"Batch loss: {loss_value}")
-                
-    #             print(f"Batch loss {iter_idx}: {np.mean(loss_value)}")
-    #             #print(f"Batch loss: {loss_value}")
-
-    #         grads = tape.gradient(loss_value, model.trainable_variables)
-    #         optimizer.apply_gradients(zip(grads, model.trainable_variables))
-
-    #         # Track progress
-    #         epoch_loss_avg(loss_value)  # Add current batch loss
-    #         if iter_idx % 9 == 0:
-    #             print(
-    #                 f"Data Fetch time: {time.perf_counter() - datafetch_time}, for batch size: {metas.shape[0]}")
-    #             datafetch_time = time.perf_counter()
-
-    #         if iter_idx % 9 == 0:
-    #             print("epoch : %d , iter: %d,  epoch loss: %s" %
-    #                   (epoch + 1, iter_idx + 1, loss_value))
-
-    #     # End epoch
-    #     train_loss_results.append(epoch_loss_avg.result())
-    #     logging.debug(train_loss_results)
-    #     print(f"Epoch result: {epoch_loss_avg.result()}")
-    #     print(f"Elapsed time for epoch: {time.perf_counter() - start_time}")
