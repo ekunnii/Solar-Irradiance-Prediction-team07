@@ -87,7 +87,7 @@ def get_image_transformed(
     time_steps = copy.deepcopy(with_pass_values) or []
     time_steps.insert(0,"0")# Time 0 image at least
 
-    image_data = copy.copy(h5_data)
+    image_data = h5_data
     global_start_time = get_global_start_date(image_data)
     image_time_offset_idx = get_image_time_offset_idx(current_date, global_start_time)
 
