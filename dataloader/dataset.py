@@ -34,7 +34,7 @@ def BuildDataSet(
 ):
     image_dim = user_config and user_config.get("image_dim") or 64
     channels = user_config and user_config.get("target_channels") or ["ch1", "ch2", "ch3", "ch4", "ch6"]
-    debug = user_config and user_config.get("debug") or True
+    debug = user_config and user_config.get("debug") or False
     with_pass_values = user_config and user_config.get("with_pass_values") or []
 
     def _train_dataset(hdf5_path):
