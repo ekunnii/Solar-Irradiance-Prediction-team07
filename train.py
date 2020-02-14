@@ -100,6 +100,8 @@ def train_step(model, optimizer, meta_data, images, labels):
     # of the loss with respect to the variables can be computed.
     with tf.GradientTape() as tape:
         logits = model(meta_data, images, training=True)
+        predictions = tf.math.exp(logits)-1
+        labels = tf.math.exp(labels)-1
         loss = compute_loss(labels, logits)
         # compute_accuracy(labels, logits)
 
@@ -107,9 +109,8 @@ def train_step(model, optimizer, meta_data, images, labels):
     grads = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
-    if tf.equal(optimizer.iterations % 5, 0):
-        print("first sample from batch", labels[0])
-        print(logits[0])  
+    if tf.equal(optimizer.iterations % 50, 0):
+        print("predictions: ", logits[0].numpy(), "labels", labels[0].numpy())
 
     return loss
 
@@ -124,8 +125,12 @@ def train(model, optimizer, dataset, log_freq=500):
 
     # Datasets can be iterated over like any other Python iterable.
     for (meta_data, images, labels) in dataset:
-        images = np.clip(images/255.0, a_min=0, a_max=255)
-        # labels = np.clip(labels/1000, a_min=0, a_max=5000)
+        images = tf.clip_by_value(
+            images/255.0, clip_value_min=0, clip_value_max=5)
+        labels = tf.clip_by_value(
+            tf.math.log(labels+1), clip_value_min = 0, clip_value_max = 20)
+        # labels/100.0, clip_value_min=0, clip_value_max=20)
+
         loss = train_step(model, optimizer, meta_data, images, labels)
         avg_loss(loss)
 
@@ -166,6 +171,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("train_config", type=str,
                         help="Path of the training config file. This file contains ")
+    parser.add_argument("-s", "--seed", type=int, default=1234,
+                        help="random seed for training")
     parser.add_argument("-n", "--num_epochs", type=int, default=100,
                         help="Number of epochs we want the model to train")
     parser.add_argument("-m", "--model_name", type=str, default="DummyModel",
@@ -173,22 +180,25 @@ if __name__ == "__main__":
                             The model name should be the modle class name. Example: 'DummyModel'. ")
     parser.add_argument("-u", "--user_config", type=str, default="",
                         help="Path to the JSON config file used to store user model/dataloader parameters")
-    parser.add_argument("-s", "--scratch_dir", type=str, default=None,
+    parser.add_argument("--scratch_dir", type=str, default=None,
                         help="Important for performance on the cluster!! If you want the files to be read fast, please set this variable.")
     parser.add_argument("--model_dir", type=str, default="./models",
                         help="Directory to save the checkpoints")
-    parser.add_argument("--training", type=bool, default=True,
+    parser.add_argument("--training", action='store_true',
                         help="Enable training or not")
-    parser.add_argument("--use_cache", type=bool, default=True,
+    parser.add_argument("--use_cache", action='store_true',
                         help="Enable dataloader cache or not")
-    parser.add_argument("--delete_checkpoints", type=bool, default=False,
+    parser.add_argument("--delete_checkpoints", action='store_false',
                         help="Delete previous checkpoints or not, by default is False")
-    parser.add_argument("--load_checkpoints", type=bool, default=False,
-                        help="load previous checkpoints or not, by default is False")
+    parser.add_argument("--load_checkpoints", action='store_true',
+                        help="load previous checkpoints or not, by default is True")
 
     args = parser.parse_args()
 
     print("Starting Training!") 
+
+    tf.random.set_seed(args.seed)
+
 
     # Load configs
     assert os.path.isfile(
@@ -225,14 +235,14 @@ if __name__ == "__main__":
     else:
         train_ds = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
             .prefetch(tf.data.experimental.AUTOTUNE) \
-            .batch(batch_size) ##\
-            ##.shuffle(buffer_size)
+            .batch(batch_size) \
+            .shuffle(buffer_size)
 
     train_loss_results = []
     train_accuracy_results = []
     is_training = args.training
     compute_loss = tf.keras.losses.MSE
-    optimizer = tf.keras.optimizers.Adam(learning_rate=5e-4)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.01)
     # optimizer = optimizers.SGD(learning_rate=0.01, momentum=0.5)
     # compute_accuracy = tf.keras.metrics.SparseCategoricalAccuracy()
 

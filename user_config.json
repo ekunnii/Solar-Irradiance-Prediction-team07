@@ -2,5 +2,10 @@
     "image_dim": 64,
     "debug": false,
     "with_pass_values": [
+        "P0DT0H15M0S",
+        "P0DT0H30M0S",
+        "P0DT0H45M0S",
+        "P0DT1H0M0S"
+        "P0DT1H15M0S"
     ]
 }

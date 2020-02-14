@@ -102,6 +102,8 @@ def BuildDataSet(
 
                         if debug:
                             print(f"Returning data for {hdf5_path}")
+                        if np.isnan(station_ghis).any() or np.isnan(meta_array).any():
+                            continue
                         yield (meta_array, image_data, station_ghis)
 
                 if debug:
