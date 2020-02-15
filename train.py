@@ -1,5 +1,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 from tensorflow.keras import datasets, layers, models, optimizers, metrics
+from tensorflow.keras.applications.resnet50 import preprocess_input
 from tensorflow import keras
 from tensorflow.python.ops import summary_ops_v2
 
@@ -30,7 +31,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 train loop credit to https://github.com/dragen1860/TensorFlow-2.x-Tutorials/blob/master/01-TF2.0-Overview/conv_train.py
 """
 
-tf.keras.backend.set_floatx('float64')
+#tf.keras.backend.set_floatx('float64') #commented because it crashes resnet
 
 def extract_data_frame_path(train_config: json):
     """
@@ -80,7 +81,7 @@ def solar_datasets(datasets):
 
     """
     print("*******Create training dataset********")
-    if not args.dont_use_cache:
+    if args.use_cache:
         train_ds = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
             .prefetch(tf.data.experimental.AUTOTUNE) \
             .batch(batch_size) \
@@ -96,14 +97,19 @@ def solar_datasets(datasets):
     return train_ds, eval_ds
 
 def train_step(model, optimizer, meta_data, images, labels):
-    images = tf.keras.utils.normalize(images, axis=-1)
+    if 'pretrained' in args.model_name:
+        #if pretrained, must use the same preprocess as when the model was trained, here preprocess of resnet
+        images = preprocess_input(images[:,:,:,0:3])
+    else:
+        images = tf.keras.utils.normalize(images, axis=-1)
+
 
     # Record the operations used to compute the loss, so that the gradient
     # of the loss with respect to the variables can be computed.
     with tf.GradientTape() as tape:
         y_pred = model(meta_data, images, training=True)
         loss = compute_loss(labels, y_pred)
-        print('pred', np.mean(y_pred, axis=0), 'label:', np.mean(labels, axis=0), 'nb prediction 0:', y_pred.shape[0]*y_pred.shape[1] -  np.sum(y_pred <= 1))
+        print('pred', np.mean(y_pred, axis=0), 'label:', np.mean(labels, axis=0), 'nb prediction 0:', np.sum(y_pred <= 1))
 
     grads = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
@@ -131,7 +137,7 @@ def train(model, optimizer, dataset, log_freq=50):
             print('step:', int(optimizer.iterations),
                   'loss:', avg_loss.result().numpy(),
                   'RMSE:', np.sqrt(avg_loss.result().numpy()))
-            logging.debug(np.sqrt(avg_loss.result().numpy()))
+            logging.debug(str(np.sqrt(avg_loss.result().numpy()))+', ')
         avg_loss.reset_states()
             # compute_accuracy.reset_states()
 
@@ -209,8 +215,6 @@ if __name__ == "__main__":
         stations, target_time_offsets, args.user_config)
     model = model_factory.build(args.model_name)
 
-
-
     print("*******Create training dataset********")
     if args.use_cache:
         train_ds = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
@@ -229,12 +233,17 @@ if __name__ == "__main__":
     is_training = args.training
 
     # loss_fct = tf.keras.losses.MSE
-    optimizer = tf.keras.optimizers.Adam(learning_rate=0.00003)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001) #0.00003
     compute_loss = tf.keras.losses.MSE
     # optimizer = optimizers.SGD(learning_rate=0.01, momentum=0.5)
 
-    logging.basicConfig(filename='result.log',level=logging.DEBUG)
-    logging.debug("********New run**************")
+    logging.basicConfig(filename='result.log',level=logging.DEBUG, format='%(message)s')
+    ## tried to log on the same line and remove warning, but it doesnt work
+    # logging.captureWarnings(False)
+    # handler = logging.StreamHandler()
+    # handler.terminator = ""
+
+    logging.debug("Start")
 
     # Where to save checkpoints, tensorboard summaries, etc.
     checkpoint_dir = os.path.join(args.model_dir, 'checkpoints')

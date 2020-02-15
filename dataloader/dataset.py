@@ -69,10 +69,17 @@ def BuildDataSet(
 
                         # get meta info
                         lat, lont, alt = stations[station_idx] #lat, lont, alt
+                        # Warning, encoding of hours/minutes doesn't take into account the actual time according
+                        # to the different timezone of the different stations?
                         sin_month,cos_month,sin_minute,cos_minute = utils.convert_time(row.name) #encoding months and hour/minutes
                         daytime_flag, clearsky, _, __ = row.loc[row.index.str.startswith(station_idx)]
-                        meta_array = np.array([sin_month,cos_month,sin_minute,cos_minute,
-                                                lat, lont, alt, daytime_flag, clearsky], dtype=np.float64)
+
+                        ## REPLACED COMPLETE META WITH MINIMALISTIC META
+                        # meta_array = np.array([sin_month,cos_month,sin_minute,cos_minute,
+                        #                         lat, lont, alt, daytime_flag, clearsky], dtype=np.float64)
+
+                        # trying with minimalistic meta_array
+                        meta_array = np.array([daytime_flag, clearsky], dtype=np.float64)
 
                         # Get image data
                         image_data = du.get_image_transformed(
@@ -102,6 +109,8 @@ def BuildDataSet(
 
                         if debug:
                             print(f"Returning data for {hdf5_path}")
+                        if np.isnan(station_ghis).any() or np.isnan(meta_array).any():
+                            continue
                         yield (meta_array, image_data, station_ghis)
 
                 if debug:
