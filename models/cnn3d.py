@@ -7,7 +7,7 @@ from tensorflow.keras.optimizers import Adam
 class cnn3d(Model):
     def __init__(self, target_time_offsets):
 
-        # deltatime to try: -30 min, -1h, -1h30, -2h, -3h, -4h, -5h
+        # deltatime to try: -30 min, -1h, -2h, -3h, -4h, -5h
         super(cnn3d, self).__init__()
         self.conv1 = Conv3D(filters = 64, kernel_size =( 3, 3, 3), padding = 'same', activation='relu', input_shape=(64, 64, 7, 5))
         self.conv2 = Conv3D(filters = 64, kernel_size =(4, 4, 4), padding = 'same', activation='relu')
