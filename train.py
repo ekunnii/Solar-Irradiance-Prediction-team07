@@ -108,7 +108,6 @@ def solar_datasets():
 def preprocess(images, meta_data):
     # if pretrained, must use the same preprocess as when the model was trained, here preprocess of resnet
     if 'pretrained' in args.model_name:
-
         # images = preprocess_input_resnet50(images[:,:,:,0:3]) # select 3 channels in a way that works only for consecutive channels
         images = tf.convert_to_tensor(images.numpy()[:,:,:,[0,2,4]]) # select 3 non-consecutive channels
         images = preprocess_input_resnet50(images)

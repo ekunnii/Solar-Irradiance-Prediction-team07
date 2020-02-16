@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --time=60:00
+#SBATCH --time=10:00:00
 #SBATCH --gres=gpu:k80:1
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=10000M
+#SBATCH --mem=100000M
 
 module load python/3.7
 virtualenv --no-download $SLURM_TMPDIR/env
@@ -17,6 +17,8 @@ pip install --no-index opencv-python
 pip install --no-index matplotlib
 pip install --no-index tqdm
 
+cp -ru /project/cq-training-1/project1/teams/team07/.keras ~/
+
 # python --version
 # which python
 # which pip
@@ -24,6 +26,6 @@ pip install --no-index tqdm
 
 echo ""
 echo "Calling python train script."
-stdbuf -oL python -u ./train.py $PWD"/train_config.json" -n 200 -m "pretrained_resnet" --run_setting "pretrained resnet50, channels [0,2,4], crop 64, nofreeze" --use_cache "" --scratch_dir $SCRATCH
+stdbuf -oL python -u ./train.py $PWD"/train_config.json" -n 200 -m "pretrained_resnet" --run_setting "pretrained resnet50, channels [0,2,4], crop 64, nofreeze" --use_cache "" --scratch_dir $SCRATCH --load_checkpoints "True"
 stdbuf -oL python -u ./test.py
 
