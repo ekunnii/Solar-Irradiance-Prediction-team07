@@ -4,6 +4,8 @@ import json
 
 from models.dummy_model import DummyModel
 from models.cnn2d import cnn2d
+from models.resnet import resnet
+from models.cnn3d import cnn3d
 import tensorflow as tf
 
 
@@ -32,7 +34,8 @@ class ModelFactory():
         # Declare new models here and map builder function to it.
         self.models = {
             "DummyModel": self.BuildDummyModel,
-            "CNN2D": self.BuildCNN2DModel
+            "CNN2D": self.BuildCNN2DModel,
+            'pretrained_resnet': self.BuildResnet
         }
 
     def build(self, modelName):
@@ -50,6 +53,24 @@ class ModelFactory():
     def BuildCNN2DModel(self) -> tf.keras.Model:
         """
         A model example to test out workflow.
+
+        Returns:
+            A ``tf.keras.Model`` object that can be used to generate new GHI predictions given imagery tensors.
+        """
+        return cnn2d(self.target_time_offsets)
+
+    def BuildResnet(self) -> tf.keras.Model:
+        """
+        Pre-trained resnet50
+
+        Returns:
+            A ``tf.keras.Model`` object that can be used to generate new GHI predictions given imagery tensors.
+        """
+        return resnet(self.target_time_offsets)
+    
+    def BuildCNN3DModel(self) -> tf.keras.Model:
+        """
+        A cnn3d model to test out
 
         Returns:
             A ``tf.keras.Model`` object that can be used to generate new GHI predictions given imagery tensors.

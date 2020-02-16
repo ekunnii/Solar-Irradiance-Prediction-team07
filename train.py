@@ -1,5 +1,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 from tensorflow.keras import datasets, layers, models, optimizers, metrics
+from tensorflow.keras.applications.resnet50 import preprocess_input
 from tensorflow import keras
 from tensorflow.python.ops import summary_ops_v2
 
@@ -30,7 +31,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 train loop credit to https://github.com/dragen1860/TensorFlow-2.x-Tutorials/blob/master/01-TF2.0-Overview/conv_train.py
 """
 
-tf.keras.backend.set_floatx('float64')
+#tf.keras.backend.set_floatx('float64') #commented because it crashes resnet
 
 def extract_data_frame_path(train_config: json):
     """
@@ -66,10 +67,10 @@ def plot_loss(train_losses, eval_losses):
 
 def apply_clean(dirname):
     """delete directory
-    
+
     Arguments:
         dirname {[type]} -- [description]
-    """    
+    """
     if tf.io.gfile.exists(dirname):
         print('Removing existing dir: {}'.format(dirname))
         tf.io.gfile.rmtree(dirname)
@@ -78,7 +79,8 @@ def solar_datasets_split(datasets):
     """
     train and eaval split
 
-    """    
+    """
+    print("*******Create training dataset********")
     if args.use_cache:
         train_ds = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
             .prefetch(tf.data.experimental.AUTOTUNE) \
@@ -88,22 +90,25 @@ def solar_datasets_split(datasets):
     else:
         train_ds = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
             .prefetch(tf.data.experimental.AUTOTUNE) \
-            .batch(batch_size)
+            .batch(batch_size) \
+            .shuffle(buffer_size)
 
     eval_ds = train_ds
 
     return train_ds, eval_ds
 
 def train_step(model, optimizer, meta_data, images, labels):
-
+    if 'pretrained' in args.model_name:
+        #if pretrained, must use the same preprocess as when the model was trained, here preprocess of resnet
+        images = preprocess_input(images[:,:,:,0:3])
+    else:
+        images = tf.keras.utils.normalize(images, axis=-1)
     # Record the operations used to compute the loss, so that the gradient
     # of the loss with respect to the variables can be computed.
     with tf.GradientTape() as tape:
-        logits = model(meta_data, images, training=True)
-        predictions = tf.math.exp(logits)-1
-        labels = tf.math.exp(labels)-1
-        loss = compute_loss(labels, logits)
-        # compute_accuracy(labels, logits)
+        y_pred = model(meta_data, images, training=True)
+        loss = compute_loss(labels, y_pred)
+        print('pred', np.mean(y_pred, axis=0), 'label:', np.mean(labels, axis=0), 'nb prediction 0:', np.sum(y_pred <= 1))
 
 
     grads = tape.gradient(loss, model.trainable_variables)
@@ -135,34 +140,36 @@ def train(model, optimizer, dataset, log_freq=500):
         avg_loss(loss)
 
         if tf.equal(optimizer.iterations % log_freq, 0):
-            
+            # print("first sample from batch", images[0], labels[0])
             # summary_ops_v2.scalar('loss', avg_loss.result(), step=optimizer.iterations)
             # summary_ops_v2.scalar('accuracy', compute_accuracy.result(), step=optimizer.iterations)
             print('step:', int(optimizer.iterations),
                   'loss:', avg_loss.result().numpy(),
                   'RMSE:', np.sqrt(avg_loss.result().numpy()))
+            logging.debug(str(np.sqrt(avg_loss.result().numpy()))+', ')
+
+        # TEMP location, when the validation process will be available,
+        # to be moved out to log the rmse at the end of each epoch (like test_summary_writer)
+        with train_summary_writer.as_default():
+            tf.summary.scalar('RMSE', np.sqrt(avg_loss.result().numpy()), step=optimizer.iterations )
         avg_loss.reset_states()
-            # compute_accuracy.reset_states()
+        # compute_accuracy.reset_states()
 
 
-def test(model, dataset, step_num):
+def test(model, dataset):
     """
     Perform an evaluation of `model` on the examples from `dataset`.
     """
     avg_loss = metrics.Mean('loss', dtype=tf.float32)
 
     for (meta_data, images, labels) in dataset:
-        logits = model(metas_data, images, training=False)
-        avg_loss(compute_loss(labels, logits))
-        # compute_accuracy(labels, logits)
+        y_pred = model(meta_data, images, training=False)
+        avg_loss(compute_loss(labels, y_pred))
 
     print('Model test set loss: {:0.4f} RMSE: {:0.2f}%'.format(
         avg_loss.result(), np.sqrt(avg_loss.result().numpy())))
 
-    print('loss:', avg_loss.result(), 'RMSE:',
-          np.sqrt(avg_loss.result().numpy()))
-    # summary_ops_v2.scalar('loss', avg_loss.result(), step=step_num)
-    # summary_ops_v2.scalar('accuracy', compute_accuracy.result(), step=step_num)
+    return np.sqrt(avg_loss.result().numpy())
 
 if __name__ == "__main__":
     print("Entering training python script.")
@@ -195,7 +202,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    print("Starting Training!") 
+    print("Starting Training!")
 
     tf.random.set_seed(args.seed)
 
@@ -223,8 +230,6 @@ if __name__ == "__main__":
         stations, target_time_offsets, args.user_config)
     model = model_factory.build(args.model_name)
 
-    
-
     print("*******Create training dataset********")
     if args.use_cache:
         train_ds = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
@@ -241,17 +246,29 @@ if __name__ == "__main__":
     train_loss_results = []
     train_accuracy_results = []
     is_training = args.training
+
+    # loss_fct = tf.keras.losses.MSE
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001) #0.00003
     compute_loss = tf.keras.losses.MSE
-    optimizer = tf.keras.optimizers.Adam(learning_rate=0.01)
     # optimizer = optimizers.SGD(learning_rate=0.01, momentum=0.5)
-    # compute_accuracy = tf.keras.metrics.SparseCategoricalAccuracy()
 
+    logging.basicConfig(filename='result.log',level=logging.DEBUG, format='%(message)s')
+    ## tried to log on the same line and remove warning, but it doesnt work
+    # logging.captureWarnings(False)
+    # handler = logging.StreamHandler()
+    # handler.terminator = ""
 
-    logging.basicConfig(filename='result.log',level=logging.DEBUG)
+    logging.debug("[")
 
     # Where to save checkpoints, tensorboard summaries, etc.
     checkpoint_dir = os.path.join(args.model_dir, 'checkpoints')
     checkpoint_prefix = os.path.join(checkpoint_dir, 'ckpt')
+
+    current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    train_log_dir = 'logs/'+args.model_name+'/'+current_time+'/train'
+    test_log_dir = 'logs/'+args.model_name+'/'+current_time+'/test'
+    train_summary_writer = tf.summary.create_file_writer(train_log_dir)
+    test_summary_writer = tf.summary.create_file_writer(test_log_dir)
 
     # clear previous checkpoints for debug purpose
     if args.delete_checkpoints:
@@ -262,17 +279,22 @@ if __name__ == "__main__":
     # Restore variables on creation if a checkpoint exists.
     if args.load_checkpoints:
         checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
-
     for i in range(args.num_epochs):
         start = time.time()
-        #   with train_summary_writer.as_default():
-        train(model, optimizer, train_ds, log_freq=50)
+
+        train(model, optimizer, train_ds, log_freq=1)
         end = time.time()
-        print('Train time for epoch #{} ({} total steps): {}'.format(
+        print('Epoch #{} ({} total steps): {}sec'.format(
             i + 1, int(optimizer.iterations), end - start))
-        
-        # with test_summary_writer.as_default():
-        #     test(model, test_ds, optimizer.iterations)
 
         checkpoint.save(checkpoint_prefix)
         print('saved checkpoint.')
+
+        # valid_rmse = test(model, test_ds)
+        # with test_summary_writer.as_default():
+        #     tf.summary.scalar('RMSE', valid_rmse, step=i)
+
+
+    # export_path = os.path.join(MODEL_DIR, 'export')
+    # tf.saved_model.save(model, export_path)
+    # print('saved SavedModel for exporting.')
