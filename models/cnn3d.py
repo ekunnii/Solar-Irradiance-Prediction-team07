@@ -3,6 +3,7 @@ import numpy as np
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, Flatten, Conv3D, MaxPool3D, ZeroPadding3D, Concatenate
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras import Model
 
 class cnn3d(Model):
     def __init__(self, target_time_offsets):
