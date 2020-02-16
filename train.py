@@ -90,7 +90,8 @@ def solar_datasets(datasets):
     else:
         train_ds = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
             .prefetch(tf.data.experimental.AUTOTUNE) \
-            .batch(batch_size)
+            .batch(batch_size) \
+            .shuffle(buffer_size)
 
     eval_ds = train_ds
 
@@ -102,8 +103,6 @@ def train_step(model, optimizer, meta_data, images, labels):
         images = preprocess_input(images[:,:,:,0:3])
     else:
         images = tf.keras.utils.normalize(images, axis=-1)
-
-
     # Record the operations used to compute the loss, so that the gradient
     # of the loss with respect to the variables can be computed.
     with tf.GradientTape() as tape:
@@ -138,28 +137,29 @@ def train(model, optimizer, dataset, log_freq=50):
                   'loss:', avg_loss.result().numpy(),
                   'RMSE:', np.sqrt(avg_loss.result().numpy()))
             logging.debug(str(np.sqrt(avg_loss.result().numpy()))+', ')
+
+        # TEMP location, when the validation process will be available,
+        # to be moved out to log the rmse at the end of each epoch (like test_summary_writer)
+        with train_summary_writer.as_default():
+            tf.summary.scalar('RMSE', np.sqrt(avg_loss.result().numpy()), step=optimizer.iterations )
         avg_loss.reset_states()
-            # compute_accuracy.reset_states()
+        # compute_accuracy.reset_states()
 
 
-def test(model, dataset, step_num):
+def test(model, dataset):
     """
     Perform an evaluation of `model` on the examples from `dataset`.
     """
     avg_loss = metrics.Mean('loss', dtype=tf.float32)
 
     for (meta_data, images, labels) in dataset:
-        logits = model(meta_data, images, training=False)
-        avg_loss(compute_loss(labels, logits))
-        # compute_accuracy(labels, logits)
+        y_pred = model(meta_data, images, training=False)
+        avg_loss(compute_loss(labels, y_pred))
 
     print('Model test set loss: {:0.4f} RMSE: {:0.2f}%'.format(
         avg_loss.result(), np.sqrt(avg_loss.result().numpy())))
 
-    print('loss:', avg_loss.result(), 'RMSE:',
-          np.sqrt(avg_loss.result().numpy()))
-    # summary_ops_v2.scalar('loss', avg_loss.result(), step=step_num)
-    # summary_ops_v2.scalar('accuracy', compute_accuracy.result(), step=step_num)
+    return np.sqrt(avg_loss.result().numpy())
 
 if __name__ == "__main__":
     print("Entering training python script.")
@@ -243,11 +243,17 @@ if __name__ == "__main__":
     # handler = logging.StreamHandler()
     # handler.terminator = ""
 
-    logging.debug("Start")
+    logging.debug("[")
 
     # Where to save checkpoints, tensorboard summaries, etc.
     checkpoint_dir = os.path.join(args.model_dir, 'checkpoints')
     checkpoint_prefix = os.path.join(checkpoint_dir, 'ckpt')
+
+    current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    train_log_dir = 'logs/'+args.model_name+'/'+current_time+'/train'
+    test_log_dir = 'logs/'+args.model_name+'/'+current_time+'/test'
+    train_summary_writer = tf.summary.create_file_writer(train_log_dir)
+    test_summary_writer = tf.summary.create_file_writer(test_log_dir)
 
     # clear previous checkpoints for debug purpose
     if args.delete_checkpoints:
@@ -260,17 +266,19 @@ if __name__ == "__main__":
         checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
     for i in range(args.num_epochs):
         start = time.time()
-        #   with train_summary_writer.as_default():
+
         train(model, optimizer, train_ds, log_freq=1)
         end = time.time()
-        # print('Train time for epoch #{} ({} total steps): {}'.format(
-        #     i + 1, int(optimizer.iterations), end - start))
-
-        # with test_summary_writer.as_default():
-        #     test(model, test_ds, optimizer.iterations)
+        print('Epoch #{} ({} total steps): {}sec'.format(
+            i + 1, int(optimizer.iterations), end - start))
 
         checkpoint.save(checkpoint_prefix)
-        #print('saved checkpoint.')
+        print('saved checkpoint.')
+
+        # valid_rmse = test(model, test_ds)
+        # with test_summary_writer.as_default():
+        #     tf.summary.scalar('RMSE', valid_rmse, step=i)
+
 
     # export_path = os.path.join(MODEL_DIR, 'export')
     # tf.saved_model.save(model, export_path)
