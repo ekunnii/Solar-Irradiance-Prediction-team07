@@ -35,7 +35,8 @@ class ModelFactory():
         self.models = {
             "DummyModel": self.BuildDummyModel,
             "CNN2D": self.BuildCNN2DModel,
-            'pretrained_resnet': self.BuildResnet
+            'pretrained_resnet': self.BuildResnet,
+            'CNN3D': self.BuildCNN3DModel,
         }
 
     def build(self, modelName):
@@ -76,3 +77,15 @@ class ModelFactory():
             A ``tf.keras.Model`` object that can be used to generate new GHI predictions given imagery tensors.
         """
         return cnn2d(self.target_time_offsets)
+
+    def BuildResnet(self) -> tf.keras.Model:
+        """
+        Pre-trained resnet50
+
+        Returns:
+            A ``tf.keras.Model`` object that can be used to generate new GHI predictions given imagery tensors.
+        """
+        return resnet(self.target_time_offsets)
+
+    def BuildCNN3DModel(self) -> tf.keras.Model:
+        return cnn3d(self.target_time_offsets)
