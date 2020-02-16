@@ -24,5 +24,6 @@ pip install --no-index tqdm
 
 echo ""
 echo "Calling python train script."
-stdbuf -oL python -u ./train.py $PWD"/train_config.json" -n 1 -m "CNN2D" --train True --scratch_dir $SCRATCH
+stdbuf -oL python -u ./train.py $PWD"train_config.json" -n 200 -m "pretrained_resnet" --run_setting "pretrained resnet50, channels [0,2,4], crop 64, nofreeze" --use_cache "" --scratch_dir $SCRATCH
 stdbuf -oL python -u ./test.py
+
