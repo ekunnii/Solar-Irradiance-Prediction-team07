@@ -76,7 +76,7 @@ class ModelFactory():
         Returns:
             A ``tf.keras.Model`` object that can be used to generate new GHI predictions given imagery tensors.
         """
-        return cnn2d(self.target_time_offsets)
+        return cnn3d(self.target_time_offsets)
 
     def BuildResnet(self) -> tf.keras.Model:
         """
