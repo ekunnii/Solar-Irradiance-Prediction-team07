@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --time=10:00:00
+#SBATCH --time=11:00:00
 #SBATCH --gres=gpu:k80:1
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=100000M
+#SBATCH --mem=160000M
 
 module load python/3.7
 virtualenv --no-download $SLURM_TMPDIR/env

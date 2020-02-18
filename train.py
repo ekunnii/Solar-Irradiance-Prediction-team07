@@ -224,8 +224,8 @@ if __name__ == "__main__":
             user_config_json = json.load(uc)
 
     cache_dir = args.scratch_dir or os.getcwd()
-    batch_size = train_json.get("batch_size") or 32
-    buffer_size = train_json.get("buffer_size") or 1000
+    batch_size = train_json.get("batch_size") or 16
+    buffer_size = train_json.get("buffer_size") or 500
     data_frame_path = extract_data_frame_path(train_json)
     stations, target_time_offsets = extract_station_offsets(train_json)
 
@@ -239,11 +239,11 @@ if __name__ == "__main__":
 
     is_training = args.training
 
-    optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001) #0.00003
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.00005) #0.00003
     compute_loss = tf.keras.losses.MSE
 
     # Where to save checkpoints, tensorboard summaries, etc.
-    checkpoint_dir = os.path.join(args.model_dir, 'checkpoints')
+    checkpoint_dir = os.path.join(args.model_dir, args.model_name,'checkpoints')
     checkpoint_prefix = os.path.join(checkpoint_dir, 'ckpt')
 
     # clear previous checkpoints for debug purpose

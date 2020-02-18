@@ -54,36 +54,14 @@ class ModelFactory():
     def BuildCNN2DModel(self) -> tf.keras.Model:
         """
         A model example to test out workflow.
-
-        Returns:
-            A ``tf.keras.Model`` object that can be used to generate new GHI predictions given imagery tensors.
+        Returns: tf.keras.Model
         """
         return cnn2d(self.target_time_offsets)
 
     def BuildResnet(self) -> tf.keras.Model:
         """
         Pre-trained resnet50
-
-        Returns:
-            A ``tf.keras.Model`` object that can be used to generate new GHI predictions given imagery tensors.
-        """
-        return resnet(self.target_time_offsets)
-    
-    def BuildCNN3DModel(self) -> tf.keras.Model:
-        """
-        A cnn3d model to test out
-
-        Returns:
-            A ``tf.keras.Model`` object that can be used to generate new GHI predictions given imagery tensors.
-        """
-        return cnn3d(self.target_time_offsets)
-
-    def BuildResnet(self) -> tf.keras.Model:
-        """
-        Pre-trained resnet50
-
-        Returns:
-            A ``tf.keras.Model`` object that can be used to generate new GHI predictions given imagery tensors.
+        Returns: tf.keras.Model
         """
         return resnet(self.target_time_offsets)
 
