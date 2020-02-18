@@ -154,7 +154,6 @@ class TrainingDataSet(tf.data.Dataset):
             dataframe = dataframe[dataframe.index >= datetime.datetime.fromisoformat('2015-01-01 08:00:00')]
             dataframe = dataframe[dataframe.index <= datetime.datetime.fromisoformat('2015-12-31 07:45:00')]
 
-
         target_time_offsets = [pd.Timedelta(d).to_pytimedelta() for d in admin_config["target_time_offsets"]]
         return BuildDataSet(dataframe, stations, target_time_offsets, admin_config, user_config)
 

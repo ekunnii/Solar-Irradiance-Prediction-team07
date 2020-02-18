@@ -107,19 +107,29 @@ def solar_datasets():
 
 def preprocess(images, meta_data):
     # if pretrained, must use the same preprocess as when the model was trained, here preprocess of resnet
-    if 'pretrained' in args.model_name:
+    if 'pretrained_resnet' == args.model_name:
         # images = preprocess_input_resnet50(images[:,:,:,0:3]) # select 3 channels in a way that works only for consecutive channels
         images = tf.convert_to_tensor(images.numpy()[:,:,:,[0,2,4]]) # select 3 non-consecutive channels
         images = preprocess_input_resnet50(images)
+        images = tf.dtypes.cast(images, np.float32)
+        meta_data = tf.dtypes.cast(meta_data, np.float32)
+
+        # trying with minimalistic meta where only use daytime_flag and clearsky
+        meta_data = meta_data[:, -2:]
+
+    elif 'double_pretrained_resnet' == args.model_name or 'resnet' == args.model_name:
+
+        images = tf.dtypes.cast(images, np.float32)
+        meta_data = tf.dtypes.cast(meta_data, np.float32)
+
+        # meta_data is of shape (nb sample, 9) where the 9 features are:
+        # [sin_month,cos_month,sin_minute,cos_minute, lat, lont, alt, daytime_flag, clearsky]
+        # trying with minimalistic meta where only use daytime_flag and clearsky
+        meta_data = meta_data[:, -2:]
 
     else:
         images = tf.keras.utils.normalize(images, axis=-1)
 
-    # meta_data is of shape (nb sample, 9) where the 9 features are:
-    # [sin_month,cos_month,sin_minute,cos_minute, lat, lont, alt, daytime_flag, clearsky]
-
-    # trying with minimalistic meta where only use daytime_flag and clearsky
-    meta_data = meta_data[:,-2:]
     return images, meta_data
 
 def train_step(model, optimizer, meta_data, images, labels):
@@ -197,8 +207,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    train_log_dir = 'logs/'+args.model_name+'/'+current_time+'/train'
-    valid_log_dir = 'logs/'+args.model_name+'/'+current_time+'/valid'
+
+    train_log_dir = os.path.join('logs',args.model_name,current_time,'train') # 'logs/'+args.model_name+'/'+current_time+'/train'
+    valid_log_dir = os.path.join('logs',args.model_name,current_time,'valid') #'logs/'+args.model_name+'/'+current_time+'/valid'
     train_summary_writer = tf.summary.create_file_writer(train_log_dir)
     valid_summary_writer = tf.summary.create_file_writer(valid_log_dir)
 
@@ -234,6 +245,12 @@ if __name__ == "__main__":
     model_factory = ModelFactory(
         stations, target_time_offsets, args.user_config)
     model = model_factory.build(args.model_name)
+
+    # if args.model_name == 'double_pretrained_resnet':
+    #     for j in range(2): # for each Resnet
+    #         for layer in model.layers[j].layers[:103]: # freeze 60%
+    #             layer.trainable = False
+
 
     train_ds, valid_ds = solar_datasets()
 

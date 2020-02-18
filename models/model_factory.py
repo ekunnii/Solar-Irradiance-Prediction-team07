@@ -5,6 +5,7 @@ import json
 from models.dummy_model import DummyModel
 from models.cnn2d import cnn2d
 from models.resnet import resnet
+from models.double_resnet import double_resnet
 from models.cnn3d import cnn3d
 import tensorflow as tf
 
@@ -35,7 +36,9 @@ class ModelFactory():
         self.models = {
             "DummyModel": self.BuildDummyModel,
             "CNN2D": self.BuildCNN2DModel,
-            'pretrained_resnet': self.BuildResnet,
+            'pretrained_resnet': self.BuildPretrainedResnet,
+            'resnet': self.BuildResnet,
+            'double_pretrained_resnet': self.BuildDoubleResnet,
             'CNN3D': self.BuildCNN3DModel,
         }
 
@@ -58,12 +61,26 @@ class ModelFactory():
         """
         return cnn2d(self.target_time_offsets)
 
+    def BuildPretrainedResnet(self) -> tf.keras.Model:
+        """
+        Pre-trained resnet50
+        Returns: tf.keras.Model
+        """
+        return resnet(self.target_time_offsets, pretrained=True)
+
     def BuildResnet(self) -> tf.keras.Model:
         """
         Pre-trained resnet50
         Returns: tf.keras.Model
         """
-        return resnet(self.target_time_offsets)
+        return resnet(self.target_time_offsets, pretrained=False)
+
+    def BuildDoubleResnet(self) -> tf.keras.Model:
+        """
+        Pre-trained resnet50
+        Returns: tf.keras.Model
+        """
+        return double_resnet(self.target_time_offsets)
 
     def BuildCNN3DModel(self) -> tf.keras.Model:
         return cnn3d(self.target_time_offsets)

@@ -26,6 +26,6 @@ cp -ru /project/cq-training-1/project1/teams/team07/.keras ~/
 
 echo ""
 echo "Calling python train script."
-stdbuf -oL python -u ./train.py $PWD"/train_config.json" -n 200 -m "pretrained_resnet" --run_setting "pretrained resnet50, channels [0,2,4], crop 64, nofreeze" --use_cache "" --scratch_dir $SCRATCH --load_checkpoints "True"
+stdbuf -oL python -u ./train.py $PWD"/train_config.json" -n 200 -m "double_pretrained_resnet" --run_setting "double pretrained resnet50, crop 64, nofreeze" --use_cache "" --scratch_dir $SCRATCH --load_checkpoints "True"
 stdbuf -oL python -u ./test.py
 
