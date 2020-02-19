@@ -74,12 +74,8 @@ def BuildDataSet(
                         sin_month,cos_month,sin_minute,cos_minute = utils.convert_time(row.name) #encoding months and hour/minutes
                         daytime_flag, clearsky, _, __ = row.loc[row.index.str.startswith(station_idx)]
 
-                        ## REPLACED COMPLETE META WITH MINIMALISTIC META
-                        # meta_array = np.array([sin_month,cos_month,sin_minute,cos_minute,
-                        #                         lat, lont, alt, daytime_flag, clearsky], dtype=np.float64)
-
-                        # trying with minimalistic meta_array
-                        meta_array = np.array([daytime_flag, clearsky], dtype=np.float64)
+                        meta_array = np.array([sin_month,cos_month,sin_minute,cos_minute,
+                                                lat, lont, alt, daytime_flag, clearsky], dtype=np.float64)
 
                         # Get image data
                         image_data = du.get_image_transformed(
@@ -145,15 +141,19 @@ class TrainingDataSet(tf.data.Dataset):
 
         fast_data_frame_path = du.set_faster_path(data_frame_path, scratch_dir)
 
-        data_frame = pd.read_pickle(fast_data_frame_path)
-
-        if "start_bound" in admin_config:
-            data_frame = data_frame[data_frame.index >= datetime.datetime.fromisoformat(
-                admin_config["start_bound"])]
-        if "end_bound" in admin_config:
-            data_frame = data_frame[data_frame.index <= datetime.datetime.fromisoformat(
-                admin_config["end_bound"])]
+        dataframe = pd.read_pickle(fast_data_frame_path)
+        if train:
+            if "start_bound" in admin_config:
+                dataframe = dataframe[dataframe.index >= datetime.datetime.fromisoformat(
+                    admin_config["start_bound"] + ' 08:00:00')]
+            if "end_bound" in admin_config:
+                dataframe = dataframe[dataframe.index <= datetime.datetime.fromisoformat(
+                    admin_config["end_bound"] + ' 07:45:00')]
+        else:
+            # year 2015 is used as validation set
+            dataframe = dataframe[dataframe.index >= datetime.datetime.fromisoformat('2015-01-01 08:00:00')]
+            dataframe = dataframe[dataframe.index <= datetime.datetime.fromisoformat('2015-12-31 07:45:00')]
 
         target_time_offsets = [pd.Timedelta(d).to_pytimedelta() for d in admin_config["target_time_offsets"]]
-        return BuildDataSet(data_frame, stations, target_time_offsets, admin_config, user_config)
+        return BuildDataSet(dataframe, stations, target_time_offsets, admin_config, user_config)
 

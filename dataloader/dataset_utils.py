@@ -108,7 +108,7 @@ def get_image_transformed(
             all_images.append(all_channels)
             previous_valid_image = all_channels
             #print("Found first image")
-        elif previous_valid_image:
+        elif previous_valid_image is not None:
             all_images.append(previous_valid_image)
             #print("Unable to find other image, copy old")
         else:

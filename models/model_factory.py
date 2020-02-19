@@ -5,6 +5,7 @@ import json
 from models.dummy_model import DummyModel
 from models.cnn2d import cnn2d
 from models.resnet import resnet
+from models.double_resnet import double_resnet
 from models.cnn3d import cnn3d
 from models.cnn_lstm import cnn_lstm
 import tensorflow as tf
@@ -36,8 +37,11 @@ class ModelFactory():
         self.models = {
             "DummyModel": self.BuildDummyModel,
             "CNN2D": self.BuildCNN2DModel,
-            'pretrained_resnet': self.BuildResnet,
             "cnn_lstm": self.BuildCNN_LSTM,
+            "pretrained_resnet": self.BuildPretrainedResnet,
+            "resnet": self.BuildResnet,
+            "double_pretrained_resnet": self.BuildDoubleResnet,
+            "CNN3D": self.BuildCNN3DModel
         }
 
     def build(self, modelName):
@@ -53,37 +57,19 @@ class ModelFactory():
         return DummyModel(self.target_time_offsets)
 
     def BuildCNN2DModel(self) -> tf.keras.Model:
-        """
-        A model example to test out workflow.
-
-        Returns:
-            A ``tf.keras.Model`` object that can be used to generate new GHI predictions given imagery tensors.
-        """
         return cnn2d(self.target_time_offsets)
+
+    def BuildPretrainedResnet(self) -> tf.keras.Model:
+        return resnet(self.target_time_offsets, pretrained=True)
 
     def BuildResnet(self) -> tf.keras.Model:
-        """
-        Pre-trained resnet50
+        return resnet(self.target_time_offsets, pretrained=False)
 
-        Returns:
-            A ``tf.keras.Model`` object that can be used to generate new GHI predictions given imagery tensors.
-        """
-        return resnet(self.target_time_offsets)
-    
+    def BuildDoubleResnet(self) -> tf.keras.Model:
+        return double_resnet(self.target_time_offsets)
+
     def BuildCNN3DModel(self) -> tf.keras.Model:
-        """
-        A cnn3d model to test out
-
-        Returns:
-            A ``tf.keras.Model`` object that can be used to generate new GHI predictions given imagery tensors.
-        """
-        return cnn2d(self.target_time_offsets)
+        return cnn3d(self.target_time_offsets)
 
     def BuildCNN_LSTM(self) -> tf.keras.Model:
-        """
-        A cnn3d model to test out
-
-        Returns:
-            A ``tf.keras.Model`` object that can be used to generate new GHI predictions given imagery tensors.
-        """
         return cnn_lstm(self.target_time_offsets)

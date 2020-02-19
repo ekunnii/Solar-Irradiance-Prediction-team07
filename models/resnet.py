@@ -5,23 +5,22 @@ from tensorflow.keras.layers import Dense, Flatten, GlobalAveragePooling2D
 from tensorflow.keras import Model
 
 class resnet(Model):
-    def __init__(self, target_time_offsets):
+    def __init__(self, target_time_offsets, pretrained):
         super(resnet, self).__init__()
-        self.resnet50 = ResNet50(include_top=False, weights='imagenet', input_shape=(64, 64, 3))
-        # self.flatten = Flatten()
+        if pretrained:
+            self.resnet50 = ResNet50(include_top=False, weights='imagenet', input_shape=(64, 64, 3))
+        else:
+            self.resnet50 = ResNet50(include_top=False, weights=None, input_shape=(64, 64, 5))
         self.avg_pool = GlobalAveragePooling2D()
         self.d1 = Dense(2048+2, activation='relu') #nb of channels at the end of resnet + len(metas)
         self.d2 = Dense(len(target_time_offsets), activation="relu")
 
+
     def call(self, metas, images):
         assert not np.any(np.isnan(images))
-        images = tf.dtypes.cast(images, np.float32)
-        metas = tf.dtypes.cast(metas, np.float32)
-        # select only 3 channels because pre-trained on 3
         x = images
         x = self.resnet50(x)
         x = self.avg_pool(x) # transform to (nb of sample, nb of channel)
-        # x = self.flatten(x)
         x = tf.concat([x, metas], 1)
         x = self.d1(x)
         return self.d2(x)
