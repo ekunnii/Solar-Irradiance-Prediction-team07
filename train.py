@@ -142,7 +142,7 @@ def train(model, optimizer, dataset, log_freq=1000):
     """
     # Metrics are stateful. They accumulate values and return a cumulative
     # result when you call .result(). Clear accumulated values with .reset_states()
-    avg_loss = metrics.Mean('loss', dtype=tf.float64)
+    train_avg_loss = metrics.Mean('loss', dtype=tf.float64)
     log_transform = False
     # Datasets can be iterated over like any other Python iterable.
     for (meta_data, images, labels) in dataset:
@@ -161,8 +161,9 @@ def train(model, optimizer, dataset, log_freq=1000):
                   'RMSE:', np.sqrt(train_avg_loss.result().numpy()))
 
             with train_summary_writer.as_default():
-                tf.summary.scalar('RMSE', np.sqrt(avg_loss.result().numpy()), step=optimizer.iterations)
-            avg_loss.reset_states()
+                tf.summary.scalar('RMSE', np.sqrt(
+                    train_avg_loss.result().numpy()), step=optimizer.iterations)
+            train_avg_loss.reset_states()
 
 
 def test(model, dataset):
@@ -260,7 +261,7 @@ if __name__ == "__main__":
 
     cache_dir = args.scratch_dir or os.getcwd()
     batch_size = train_json.get("batch_size") or 16
-    buffer_size = train_json.get("buffer_size") or 500
+    buffer_size = train_json.get("buffer_size") or 100
     data_frame_path = extract_data_frame_path(train_json)
     stations, target_time_offsets = extract_station_offsets(train_json)
 
