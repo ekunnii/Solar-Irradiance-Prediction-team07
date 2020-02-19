@@ -261,7 +261,8 @@ if __name__ == "__main__":
 
     # Where to save checkpoints, tensorboard summaries, etc.
     checkpoint_dir = os.path.join(args.model_dir, args.model_name,'checkpoints')
-    checkpoint_prefix = os.path.join(checkpoint_dir, 'ckpt')
+    ckpt_prefix = 'ckpt'
+    checkpoint_prefix = os.path.join(checkpoint_dir, ckpt_prefix)
 
     # clear previous checkpoints for debug purpose
     if args.delete_checkpoints:
@@ -272,6 +273,12 @@ if __name__ == "__main__":
     # Restore variables on creation if a checkpoint exists.
     if args.load_checkpoints:
         checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
+        try:
+            checkpoint_file_path = os.path.join(checkpoint_dir,'checkpoint')
+            with open(checkpoint_file_path) as file:
+                epoch_already_done = file.readline().split(ckpt_prefix+"-")[-1][:-2]
+        except FileNotFoundError:
+            epoch_already_done = 0
 
     train_avg_loss = metrics.Mean('loss', dtype=tf.float32)
     valid_avg_loss = metrics.Mean('loss', dtype=tf.float32)
@@ -283,7 +290,7 @@ if __name__ == "__main__":
             train(model, optimizer, train_ds, log_freq=100)
             rmse = np.sqrt(train_avg_loss.result().numpy())
             with train_summary_writer.as_default():
-                tf.summary.scalar('RMSE', rmse, step=i+1)
+                tf.summary.scalar('RMSE', rmse, step=epoch_already_done+i+1)
             train_avg_loss.reset_states()
             end = time.time()
             print('Epoch #{} ({} total steps): {}sec RMSE: {}'.format(
@@ -294,7 +301,7 @@ if __name__ == "__main__":
 
         test(model, valid_ds)
         with valid_summary_writer.as_default():
-            tf.summary.scalar('RMSE', np.sqrt(valid_avg_loss.result().numpy()), step=i+1)
+            tf.summary.scalar('RMSE', np.sqrt(valid_avg_loss.result().numpy()), step=epoch_already_done+i+1)
         valid_avg_loss.reset_states()
 
 
