@@ -6,6 +6,7 @@ from models.dummy_model import DummyModel
 from models.cnn2d import cnn2d
 from models.resnet import resnet
 from models.cnn3d import cnn3d
+from models.cnn_lstm import cnn_lstm
 import tensorflow as tf
 
 
@@ -35,7 +36,8 @@ class ModelFactory():
         self.models = {
             "DummyModel": self.BuildDummyModel,
             "CNN2D": self.BuildCNN2DModel,
-            'pretrained_resnet': self.BuildResnet
+            'pretrained_resnet': self.BuildResnet,
+            "cnn_lstm": self.BuildCNN_LSTM,
         }
 
     def build(self, modelName):
@@ -76,3 +78,12 @@ class ModelFactory():
             A ``tf.keras.Model`` object that can be used to generate new GHI predictions given imagery tensors.
         """
         return cnn2d(self.target_time_offsets)
+
+    def BuildCNN_LSTM(self) -> tf.keras.Model:
+        """
+        A cnn3d model to test out
+
+        Returns:
+            A ``tf.keras.Model`` object that can be used to generate new GHI predictions given imagery tensors.
+        """
+        return cnn_lstm(self.target_time_offsets)

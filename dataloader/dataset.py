@@ -149,10 +149,10 @@ class TrainingDataSet(tf.data.Dataset):
 
         if "start_bound" in admin_config:
             data_frame = data_frame[data_frame.index >= datetime.datetime.fromisoformat(
-                admin_config["start_bound"] + ' 08:00:00')]
+                admin_config["start_bound"])]
         if "end_bound" in admin_config:
             data_frame = data_frame[data_frame.index <= datetime.datetime.fromisoformat(
-                admin_config["end_bound"] + ' 07:45:00')]
+                admin_config["end_bound"])]
 
         target_time_offsets = [pd.Timedelta(d).to_pytimedelta() for d in admin_config["target_time_offsets"]]
         return BuildDataSet(data_frame, stations, target_time_offsets, admin_config, user_config)

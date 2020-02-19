@@ -24,5 +24,8 @@ pip install --no-index tqdm
 
 echo ""
 echo "Calling python train script."
-stdbuf -oL python -u ./train.py $PWD"/train_config.json" -n 1 -m "CNN2D" --train True --scratch_dir $SCRATCH
-stdbuf -oL python -u ./test.py
+stdbuf -oL python -u ./train.py $PWD/train_config.json $PWD/train_config.json -n 10 -m "CNN2D" --scratch_dir ~/ --delete_checkpoints --use_cache -s 123
+stdbuf -oL python -u ./train.py $PWD/train_config.json $PWD/train_config.json -n 10 -m "pretrained_resnet" --scratch_dir ~/ --delete_checkpoints --use_cache -s 123
+stdbuf -oL python -u ./train.py $PWD/train_config.json $PWD/train_config.json -n 10 -m "cnn_lstm" --scratch_dir ~/ --delete_checkpoints --use_cache -s 1234 --user_config user_config.json --save_best
+
+

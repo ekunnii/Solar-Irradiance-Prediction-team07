@@ -98,24 +98,18 @@ def solar_datasets_split(datasets):
     return train_ds, eval_ds
 
 def train_step(model, optimizer, meta_data, images, labels):
-    if 'pretrained' in args.model_name:
-        #if pretrained, must use the same preprocess as when the model was trained, here preprocess of resnet
-        images = preprocess_input(images[:,:,:,0:3])
-    else:
-        images = tf.keras.utils.normalize(images, axis=-1)
+
     # Record the operations used to compute the loss, so that the gradient
     # of the loss with respect to the variables can be computed.
     with tf.GradientTape() as tape:
         y_pred = model(meta_data, images, training=True)
-        loss = compute_loss(labels, y_pred)
-        print('pred', np.mean(y_pred, axis=0), 'label:', np.mean(labels, axis=0), 'nb prediction 0:', np.sum(y_pred <= 1))
-
-
+        loss = compute_loss(labels, y_pred)   
     grads = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
     if tf.equal(optimizer.iterations % 50, 0):
-        print("predictions: ", logits[0].numpy(), "labels", labels[0].numpy())
+        print('***pred', np.mean(y_pred, axis=0), 'label:', np.mean(labels, axis=0), 'nb prediction 0:', np.sum(y_pred <= 1))
+        print("***predictions: ", y_pred[0].numpy(), "labels", labels[0].numpy())
 
     return loss
 
@@ -127,14 +121,28 @@ def train(model, optimizer, dataset, log_freq=500):
     # Metrics are stateful. They accumulate values and return a cumulative
     # result when you call .result(). Clear accumulated values with .reset_states()
     avg_loss = metrics.Mean('loss', dtype=tf.float64)
-
+    log_transform = False
     # Datasets can be iterated over like any other Python iterable.
     for (meta_data, images, labels) in dataset:
-        images = tf.clip_by_value(
-            images/255.0, clip_value_min=0, clip_value_max=5)
-        labels = tf.clip_by_value(
-            tf.math.log(labels+1), clip_value_min = 0, clip_value_max = 20)
-        # labels/100.0, clip_value_min=0, clip_value_max=20)
+        if 'cnn_lstm' in args.model_name:
+            if images.shape != [32, 6, 64, 64, 5]:
+                continue  
+            #if pretrained, must use the same preprocess as when the model was trained, here preprocess of resnet
+            images = tf.reshape(images, [-1, 64, 64, 5])     
+            images = preprocess_input(images[:,:,:,0:3])
+            images = tf.reshape(images, [32, -1, 64, 64, 3])
+            # print(images.shape)
+        elif 'pretrained' in args.model_name:
+            #if pretrained, must use the same preprocess as when the model was trained, here preprocess of resnet
+            images = preprocess_input(images[:, :, :, 0:3])
+        else:
+            images = tf.keras.utils.normalize(images, axis=-1)
+
+        if log_transform:
+            images = tf.clip_by_value(
+                images/255.0, clip_value_min=0, clip_value_max=5)
+            labels = tf.clip_by_value(
+                tf.math.log(labels+1), clip_value_min = 0, clip_value_max = 20)
 
         loss = train_step(model, optimizer, meta_data, images, labels)
         avg_loss(loss)
@@ -151,7 +159,7 @@ def train(model, optimizer, dataset, log_freq=500):
         # TEMP location, when the validation process will be available,
         # to be moved out to log the rmse at the end of each epoch (like test_summary_writer)
         with train_summary_writer.as_default():
-            tf.summary.scalar('RMSE', np.sqrt(avg_loss.result().numpy()), step=optimizer.iterations )
+            tf.summary.scalar('RMSE', np.sqrt(avg_loss.result().numpy()), step=optimizer.iterations)
         avg_loss.reset_states()
         # compute_accuracy.reset_states()
 
@@ -163,13 +171,33 @@ def test(model, dataset):
     avg_loss = metrics.Mean('loss', dtype=tf.float32)
 
     for (meta_data, images, labels) in dataset:
+        if 'cnn_lstm' in args.model_name:
+            if images.shape != [32, 6, 64, 64, 5]:
+                continue
+            #if pretrained, must use the same preprocess as when the model was trained, here preprocess of resnet
+            images = tf.reshape(images, [-1, 64, 64, 5])
+            images = preprocess_input(images[:, :, :, 0:3])
+            images = tf.reshape(images, [32, -1, 64, 64, 3])
+            # print(images.shape)
+        elif 'pretrained' in args.model_name:
+            #if pretrained, must use the same preprocess as when the model was trained, here preprocess of resnet
+            images = preprocess_input(images[:, :, :, 0:3])
+        else:
+            images = tf.keras.utils.normalize(images, axis=-1)
         y_pred = model(meta_data, images, training=False)
         avg_loss(compute_loss(labels, y_pred))
 
-    print('Model test set loss: {:0.4f} RMSE: {:0.2f}%'.format(
+    print('Model validation set loss: {:0.4f} RMSE: {:0.2f}'.format(
         avg_loss.result(), np.sqrt(avg_loss.result().numpy())))
 
     return np.sqrt(avg_loss.result().numpy())
+
+def load_json(json_path):
+    assert os.path.isfile(
+        json_path), f"Invalid training configuration file: {json_path}"
+    with open(json_path, "r") as tc:
+        json_file = json.load(tc)
+        return json_file
 
 if __name__ == "__main__":
     print("Entering training python script.")
@@ -177,6 +205,8 @@ if __name__ == "__main__":
     # Arguments passed to training script
     parser = argparse.ArgumentParser()
     parser.add_argument("train_config", type=str,
+                        help="Path of the training config file. This file contains ")
+    parser.add_argument("valid_config", type=str,
                         help="Path of the training config file. This file contains ")
     parser.add_argument("-s", "--seed", type=int, default=1234,
                         help="random seed for training")
@@ -191,16 +221,23 @@ if __name__ == "__main__":
                         help="Important for performance on the cluster!! If you want the files to be read fast, please set this variable.")
     parser.add_argument("--model_dir", type=str, default="./models",
                         help="Directory to save the checkpoints")
-    parser.add_argument("--training", action='store_true',
-                        help="Enable training or not")
-    parser.add_argument("--use_cache", action='store_true',
-                        help="Enable dataloader cache or not")
-    parser.add_argument("--delete_checkpoints", action='store_false',
+    parser.add_argument("--predict", action='store_true', default=False,
+                        help="Predict with trained model or not")
+    parser.add_argument("--use_cache", action='store_true', default=False,
+                        help="Enable dataloader cache or not, default is False")
+    parser.add_argument("--delete_checkpoints", action='store_true', default=False,
                         help="Delete previous checkpoints or not, by default is False")
-    parser.add_argument("--load_checkpoints", action='store_true',
-                        help="load previous checkpoints or not, by default is True")
+    parser.add_argument("--load_checkpoints", action='store_true', default=False,
+                        help="load previous checkpoints or not, by default is False")
+    parser.add_argument("--save_best", action='store_true', default=False,
+                        help="save best checkpoints or not, by default is False")
 
     args = parser.parse_args()
+
+    if args.predict:
+        print("Start predicting with existing model")
+        if args.load_checkpoints is False:
+            print("Please add flag --load_checkpoints!")
 
     print("Starting Training!")
 
@@ -208,10 +245,8 @@ if __name__ == "__main__":
 
 
     # Load configs
-    assert os.path.isfile(
-        args.train_config), f"Invalid training configuration file: {args.train_config}"
-    with open(args.train_config, "r") as tc:
-        train_json = json.load(tc)
+    train_json = load_json(args.train_config)
+    valid_json = load_json(args.valid_config)  
 
     user_config_json = None
     if args.user_config:
@@ -237,17 +272,21 @@ if __name__ == "__main__":
             .batch(batch_size) \
             .cache(cache_dir + "/tf_learn_cache") \
             .shuffle(buffer_size)
+        valid_ds = TrainingDataSet(data_frame_path, stations, valid_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
+            .prefetch(tf.data.experimental.AUTOTUNE) \
+            .batch(batch_size) \
+            .cache(cache_dir + "/tf_valid_cache") \
+            .shuffle(buffer_size)
     else:
         train_ds = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
             .prefetch(tf.data.experimental.AUTOTUNE) \
             .batch(batch_size) \
             .shuffle(buffer_size)
+        valid_ds = TrainingDataSet(data_frame_path, stations, valid_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
+            .prefetch(tf.data.experimental.AUTOTUNE) \
+            .batch(batch_size) \
+            .shuffle(buffer_size)
 
-    train_loss_results = []
-    train_accuracy_results = []
-    is_training = args.training
-
-    # loss_fct = tf.keras.losses.MSE
     optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001) #0.00003
     compute_loss = tf.keras.losses.MSE
     # optimizer = optimizers.SGD(learning_rate=0.01, momentum=0.5)
@@ -260,15 +299,16 @@ if __name__ == "__main__":
 
     logging.debug("[")
 
-    # Where to save checkpoints, tensorboard summaries, etc.
-    checkpoint_dir = os.path.join(args.model_dir, 'checkpoints')
-    checkpoint_prefix = os.path.join(checkpoint_dir, 'ckpt')
-
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     train_log_dir = 'logs/'+args.model_name+'/'+current_time+'/train'
     test_log_dir = 'logs/'+args.model_name+'/'+current_time+'/test'
     train_summary_writer = tf.summary.create_file_writer(train_log_dir)
     test_summary_writer = tf.summary.create_file_writer(test_log_dir)
+
+    # Where to save checkpoints, tensorboard summaries, etc.
+    checkpoint_dir = os.path.join(args.model_dir, 'checkpoints')
+    checkpoint_prefix = os.path.join(checkpoint_dir, 'ckpt')
+    best_checkpoint_prefix = os.path.join(checkpoint_dir, 'best-ckpt')
 
     # clear previous checkpoints for debug purpose
     if args.delete_checkpoints:
@@ -279,10 +319,12 @@ if __name__ == "__main__":
     # Restore variables on creation if a checkpoint exists.
     if args.load_checkpoints:
         checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
+
+    lowest_valid_rmse = np.inf
     for i in range(args.num_epochs):
         start = time.time()
 
-        train(model, optimizer, train_ds, log_freq=1)
+        train(model, optimizer, train_ds, log_freq=50)
         end = time.time()
         print('Epoch #{} ({} total steps): {}sec'.format(
             i + 1, int(optimizer.iterations), end - start))
@@ -290,9 +332,17 @@ if __name__ == "__main__":
         checkpoint.save(checkpoint_prefix)
         print('saved checkpoint.')
 
-        # valid_rmse = test(model, test_ds)
-        # with test_summary_writer.as_default():
-        #     tf.summary.scalar('RMSE', valid_rmse, step=i)
+        # TODO 
+        if 'pretrained' in args.model_name:
+            valid_rmse = test(model, train_ds)
+        valid_rmse = test(model, valid_ds)
+
+        if args.save_best and valid_rmse < lowest_valid_rmse:
+            checkpoint.save(best_checkpoint_prefix)
+            print('saved best checkpoint.')
+        
+        with test_summary_writer.as_default():
+            tf.summary.scalar('RMSE', valid_rmse, step=i)
 
 
     # export_path = os.path.join(MODEL_DIR, 'export')
