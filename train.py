@@ -270,7 +270,7 @@ if __name__ == "__main__":
         stations, target_time_offsets, args.user_config)
     model = model_factory.build(args.model_name)
 
-    print("*******Create training dataset********")
+    # print("*******Create training dataset********")
     # if args.use_cache:
     #     train_ds = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
     #         .prefetch(tf.data.experimental.AUTOTUNE) \
