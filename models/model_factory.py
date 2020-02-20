@@ -42,7 +42,6 @@ class ModelFactory():
             'resnet': resnet,
             'double_pretrained_resnet': double_resnet,
             'CNN3D': cnn3d,
-            "CNN3D": self.BuildCNN3DModel
         }
 
     def build(self, modelName):
