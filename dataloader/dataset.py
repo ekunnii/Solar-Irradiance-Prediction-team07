@@ -37,6 +37,7 @@ def BuildDataSet(
     debug = user_config and user_config.get("debug") or False
     with_pass_values = user_config and user_config.get("with_pass_values") or []
     df_image_column = user_config and user_config.get("df_image_column") or 'hdf5_8bit_path'
+    random_subset_of_days = user_config and user_config.get("random_subset_of_days") or False
 
     def _train_dataset(hdf5_path):
         # get day time index from filename, and iterate through all the day
@@ -120,6 +121,12 @@ def BuildDataSet(
 
     # Only get dataloaders for image files that exist. 
     image_files_to_process = dataframe[(df_image_column)] [(dataframe[df_image_column].str.contains('nan|NAN|NaN') == False)].unique()
+
+    # we don't want to use the whole dataset, so we subsample it so the model runs faster with the cache
+    np.random.shuffle(image_files_to_process)
+    if random_subset_of_days:
+        if random_subset_of_days < len(image_files_to_process):
+            image_files_to_process = image_files_to_process[:random_subset_of_days]
 
     # Create an interleaved dataset so it's faster. Each dataset is responsible to load it's own compressed image file.
     files = tf.data.Dataset.from_tensor_slices(image_files_to_process)

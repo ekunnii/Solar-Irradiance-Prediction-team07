@@ -7,5 +7,13 @@
         "P0DT0H45M0S",
         "P0DT1H0M0S",
         "P0DT1H15M0S"
-    ]
+    ],
+    "df_image_column": "hdf5_8bit_path",
+
+    "random_subset_of_days": 250,
+
+    "model_name": "CNN3D", 
+    "cnn3d": {
+        "model_path": "C:/Users/Game/AI/ProjectClass/Solar-Irradiance-Prediction-team07/models/cnn3d good model"
+    }
 }
