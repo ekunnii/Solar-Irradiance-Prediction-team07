@@ -140,6 +140,7 @@ def train(model, optimizer, dataset, log_freq=1000):
     """
     Trains model on `dataset` using `optimizer`.
     """
+    start = time.time()
     # Metrics are stateful. They accumulate values and return a cumulative
     # result when you call .result(). Clear accumulated values with .reset_states()
     train_avg_loss = metrics.Mean('loss', dtype=tf.float64)
@@ -165,12 +166,19 @@ def train(model, optimizer, dataset, log_freq=1000):
                     train_avg_loss.result().numpy()), step=optimizer.iterations)
             train_avg_loss.reset_states()
 
+    end = time.time()
+    print('Epoch #{} ({} total steps): {}sec'.format(i + 1, int(optimizer.iterations), end - start))
+
 
 def test(model, dataset):
     """
     Perform an evaluation of `model` on the examples from `dataset`.
     """
     valid_avg_loss = metrics.Mean('loss', dtype=tf.float64)
+    before = valid_avg_loss.result()
+    valid_avg_loss.reset_states()
+    after = valid_avg_loss.result()
+    print("Need reset states for val loss?", before, after)
 
     for (meta_data, images, labels) in dataset:
         images, meta_data = preprocess(images, meta_data)
@@ -317,12 +325,8 @@ if __name__ == "__main__":
 
     valid_avg_loss = metrics.Mean('loss', dtype=tf.float32)
 
-    for i in range(args.num_epochs):       
-        start = time.time()
+    for i in range(args.num_epochs):
         train(model, optimizer, train_ds, log_freq=100)
-        end = time.time()
-        print('Epoch #{} ({} total steps): {}sec RMSE: {}'.format(
-            i + 1, int(optimizer.iterations), end - start, rmse))
 
         checkpoint.save(checkpoint_prefix)
         print('saved checkpoint.')
