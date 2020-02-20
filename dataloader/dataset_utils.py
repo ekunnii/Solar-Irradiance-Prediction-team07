@@ -50,7 +50,7 @@ def get_previous_day_image_data(original_path:str) -> h5py.File:
         path = path.decode()
 
     new_date = datetime.datetime.strptime(date, '%Y.%m.%d.%H%M.h5') - datetime.timedelta(days=1)
-    print(new_date.strftime("%Y.%m.%d.0800.h5"))
+    #print(new_date.strftime("%Y.%m.%d.0800.h5"))
     #print("Dates: ", global_date.strftime("%Y.%m.%d.0800.h5"), new_date.strftime("%Y.%m.%d.0800.h5"))
     previous_day_path = path + "/" + new_date.strftime("%Y.%m.%d.0800.h5")
     assert os.path.isfile(previous_day_path), f"Unable to open previous day image h5 file: {previous_day_path}"
