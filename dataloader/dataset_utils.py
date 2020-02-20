@@ -38,11 +38,21 @@ def get_lats_lon(h5_data: h5py.File, h5_size: int):
         idx += 1
     return lats, lons
 
-def get_previous_day_image_data(original_path:str, global_date: datetime.datetime) -> h5py.File:
-    new_date = global_date - datetime.timedelta(days=1)
+def get_previous_day_image_data(original_path:str) -> h5py.File:
     path_array = os.path.split(original_path)
+
+    date = path_array[1]
+    if isinstance(date, (bytes, bytearray)):
+        date = date.decode()
+
+    path = path_array[0]
+    if isinstance(date, (bytes, bytearray)):
+        path = path.decode()
+
+    new_date = datetime.datetime.strptime(date, '%Y.%m.%d.%H%M.h5') - datetime.timedelta(days=1)
+    print(new_date.strftime("%Y.%m.%d.0800.h5"))
     #print("Dates: ", global_date.strftime("%Y.%m.%d.0800.h5"), new_date.strftime("%Y.%m.%d.0800.h5"))
-    previous_day_path = path_array[0].decode() + "/" + new_date.strftime("%Y.%m.%d.0800.h5")
+    previous_day_path = path + "/" + new_date.strftime("%Y.%m.%d.0800.h5")
     assert os.path.isfile(previous_day_path), f"Unable to open previous day image h5 file: {previous_day_path}"
     return h5py.File(previous_day_path, "r")
 
@@ -55,8 +65,8 @@ def get_global_start_date(image_data):
 
 
 def get_image_transformed(
-    hdf5_path: str,
     h5_data: h5py.File, 
+    h5_data_previous_day: h5py.File,
     channels, 
     station_pixel_coords, 
     cropped_img_size: int, 
@@ -91,25 +101,25 @@ def get_image_transformed(
     global_start_time = get_global_start_date(image_data)
     image_time_offset_idx = get_image_time_offset_idx(current_date, global_start_time)
 
-    all_images = []
+    all_images = np.empty([len(time_steps), cropped_img_size, cropped_img_size, len(channels)])
     for img_idx, image_time_offset in enumerate(time_steps):
         # make sure the image is not on the previous day image file
         img_delta = pd.Timedelta(image_time_offset).to_pytimedelta()
         #print(f"1: {str(img_delta)}, {str(current_date)}, {str(global_start_time)}, {bool(current_date - img_delta < global_start_time)}")
 
         if (current_date - img_delta < global_start_time):
-            image_data = get_previous_day_image_data(hdf5_path, global_start_time)
+            image_data = h5_data_previous_day 
             #print(f"Getting previous day! {image_data}, old file: {h5_data}")
 
         # Prep images
         all_channels = get_full_image(image_data)
         
         if all_channels is not None:
-            all_images.append(all_channels)
+            all_images[img_idx] = all_channels
             previous_valid_image = all_channels
             #print("Found first image")
         elif previous_valid_image is not None:
-            all_images.append(previous_valid_image)
+            all_images[img_idx] = previous_valid_image
             #print("Unable to find other image, copy old")
         else:
             #print("No Image!!")

@@ -12,3 +12,6 @@ class DummyModel(tf.keras.Model):
     def call(self, metas, images):
         x = self.dense1(self.flatten(self.flatten(images)))
         return self.dense2(x)
+
+    def load_config(self, user_config):
+        pass
