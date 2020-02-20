@@ -46,7 +46,7 @@ def get_previous_day_image_data(original_path:str) -> h5py.File:
         date = date.decode()
 
     path = path_array[0]
-    if isinstance(date, (bytes, bytearray)):
+    if isinstance(path, (bytes, bytearray)):
         path = path.decode()
 
     new_date = datetime.datetime.strptime(date, '%Y.%m.%d.%H%M.h5') - datetime.timedelta(days=1)
