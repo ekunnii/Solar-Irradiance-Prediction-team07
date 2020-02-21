@@ -321,8 +321,7 @@ if __name__ == "__main__":
         start = time.time()
         train(model, optimizer, train_ds, log_freq=100)
         end = time.time()
-        print('Epoch #{} ({} total steps): {}sec RMSE: {}'.format(
-            i + 1, int(optimizer.iterations), end - start, rmse))
+        print('Epoch #{} ({} total steps): {}sec'.format(i + 1, int(optimizer.iterations), end - start))
 
         checkpoint.save(checkpoint_prefix)
         print('saved checkpoint.')

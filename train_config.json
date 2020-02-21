@@ -12,7 +12,7 @@
       "PSU": [40.72012, -77.93085, 376],
       "SXF": [43.73403, -96.62328, 473]
     },
-    "batch_size": 32,
+    "batch_size": 16,
     "buffer_size": 100,
     "target_time_offsets": [
       "P0DT0H0M0S",

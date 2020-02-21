@@ -31,5 +31,6 @@ stdbuf -oL python -u ./train.py $PWD/train_config.json $PWD/train_config.json -n
 stdbuf -oL python -u ./train.py $PWD/train_config.json $PWD/train_config.json -n 10 -m "cnn_lstm" --scratch_dir $SCRATCH --delete_checkpoints --use_cache -s 1234 --user_config user_config.json --save_best
 
 stdbuf -oL python -u ./train.py $PWD"/train_config.json" -n 200 -m "double_pretrained_resnet" --run_setting "double pretrained resnet50, crop 64, nofreeze" --scratch_dir $SCRATCH --load_checkpoints
+stdbuf -oL python -u ./train.py $PWD"/train_config.json" -n 200 -m "cnn_lstm" --run_setting "cnn_lstm_100_epochs_test"  -s 1234 --user_config user_config.json --save_best --use_cache
 stdbuf -oL python -u ./test.py
 
