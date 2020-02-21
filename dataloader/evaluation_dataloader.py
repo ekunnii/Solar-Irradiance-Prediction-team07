@@ -29,10 +29,12 @@ def evaluation_dataset(
     def _eval_dataset():
 
         targets = dataframe[dataframe.index.isin(target_datetimes)]
+        print(f"Targets: {targets}")
         assert targets.shape[0] == len(target_datetimes), "Could not find all specified targets dates in dataframe. Missing targets!"
         for row_date, row in targets.iterrows():
             image_path = row.loc['hdf5_8bit_path']
             # assert image_path.contains('nan|NAN|NaN'), "Target image has no image path!"
+            print(f'Getting {row_date}...')
             
             with h5py.File(image_path, "r") as h5_data, du.get_previous_day_image_data(image_path) as h5_data_previous_day:
                 
@@ -73,7 +75,7 @@ def evaluation_dataset(
 
             if debug:
                 print(f"Not yielding any results! or done... {hdf5_path}")
-            return
+            
 
     # End of _eval_dataset function
     return tf.data.Dataset.from_generator(_eval_dataset, output_types=(tf.float64, tf.float64, tf.float64,))
