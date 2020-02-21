@@ -3,7 +3,6 @@ import numpy as np
 from tensorflow.keras.applications.resnet50 import ResNet50
 from tensorflow.keras.layers import Dense, Flatten, GlobalAveragePooling2D, LSTM, TimeDistributed, ConvLSTM2D, BatchNormalization
 from tensorflow.keras import Model
-from tensorflow.keras import Sequential
 from tensorflow.keras.applications.resnet50 import preprocess_input
 
 
@@ -58,9 +57,12 @@ class cnn_lstm(Model):
         if images.shape[1] != 6:
             return None
             #if pretrained, must use the same preprocess as when the model was trained, here preprocess of resnet
-        images = tf.reshape(images, [-1, 64, 64, 5])     
+        # [batch, past_image, image_size, image_size, channel]
+        batch_size = images.shape[0]
+        image_size =  images.shape[2] #assume square images
+        images = tf.reshape(images, [-1, image_size, image_size, 5])
         images = preprocess_input(images[:,:,:,0:3])
-        images = tf.reshape(images, [32, -1, 64, 64, 3])
+        images = tf.reshape(images, [batch_size, -1, image_size, image_size, 3])
 
         return images
 

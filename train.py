@@ -60,7 +60,6 @@ def apply_clean(dirname):
 def solar_datasets():
     """
     train and valid split
-
     """
     print("*******Create training dataset********")
     if args.use_cache:
@@ -115,7 +114,7 @@ def preprocess(images, meta_data):
         meta_data = meta_data[:, -2:]
 
     else:
-        images = tfk.keras.utils.normalize(images, axis=-1)
+        images = tf.keras.utils.normalize(images, axis=-1)
 
     return images, meta_data
 
