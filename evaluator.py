@@ -10,8 +10,8 @@ import tensorflow as tf
 import tqdm
 
 import sys,inspect
-sys.path.insert(1, os.path.join(sys.path[0], '..'))
 from models.model_factory import ModelFactory
+from dataloader.evaluation_dataloader import evaluation_dataset
 
 
 def prepare_dataloader(
@@ -59,8 +59,8 @@ def prepare_dataloader(
     # WE ARE PROVIDING YOU WITH A DUMMY DATA GENERATOR FOR DEMONSTRATION PURPOSES.
     # MODIFY EVERYTHINGIN IN THIS BLOCK AS YOU SEE FIT
 
-    data_loader = BuildDataSet(dataframe, stations, target_time_offsets, config, target_datetimes = target_datetimes)
-
+    data_loader = evaluation_dataset(dataframe, stations, target_time_offsets, config, target_datetimes = target_datetimes)\
+        .batch(2)
     ################################### MODIFY ABOVE ##################################
 
     return data_loader
@@ -79,7 +79,7 @@ def prepare_model(
     ################################### MODIFY BELOW ##################################
     # Team 7 model factory
     factory = ModelFactory(stations, target_time_offsets, config)
-    return factory.BuildDummyModel()
+    return factory.load_model_from_config()
     ################################### MODIFY ABOVE ##################################
 
 
@@ -87,19 +87,14 @@ def generate_predictions(data_loader: tf.data.Dataset, model: tf.keras.Model, pr
     """Generates and returns model predictions given the data prepared by a data loader."""
     predictions = []
     with tqdm.tqdm("generating predictions", total=pred_count) as pbar:
-        for iter_idx, minibatch in enumerate(data_loader):
-            assert isinstance(minibatch, tuple) and len(minibatch) >= 2, \
-                "the data loader should load each minibatch as a tuple with model input(s) and target tensors"
+        for (meta, image, target) in data_loader:
+            #assert isinstance(minibatch, tuple) and len(minibatch) >= 2, \
+            #    "the data loader should load each minibatch as a tuple with model input(s) and target tensors"
             # remember: the minibatch should contain the input tensor(s) for the model as well as the GT (target)
             # values, but since we are not training (and the GT is unavailable), we discard the last element
             # see https://github.com/mila-iqia/ift6759/blob/master/projects/project1/datasources.md#pipeline-formatting
             # there is only one input + groundtruth, give the model the input directly
-            if len(minibatch) == 2:
-                pred = model(minibatch[0])
-            else:  # the model expects multiple inputs, give them all at once using the tuple
-                pred = model(minibatch[:-1])
-            if isinstance(pred, tf.Tensor):
-                pred = pred.numpy()
+            pred = model(meta, image)
             assert pred.ndim == 2, "prediction tensor shape should be BATCH x SEQ_LENGTH"
             predictions.append(pred)
             pbar.update(len(pred))

@@ -4,6 +4,7 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, Flatten, Conv3D, MaxPool3D, ZeroPadding3D, Concatenate
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras import Model
+import os
 
 class cnn3d(tf.keras.Model):
     def __init__(self, target_time_offsets):
@@ -30,3 +31,14 @@ class cnn3d(tf.keras.Model):
         x = tf.concat(axis=1,values=[x, metas])
         x = self.d1(x)
         return self.d2(x)
+
+    def load_config(self, model, user_config):
+        cnn3d_config = user_config.get("cnn3d")
+        model_path = cnn3d_config.get("model_path")
+        assert os.path.exists(model_path), f"Can't find model path: {model_path}"
+
+        optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
+        checkpoint = tf.train.Checkpoint(model=model, optimizer=optimizer)
+        checkpoint.restore(tf.train.latest_checkpoint(model_path))
+        return model
+

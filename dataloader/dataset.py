@@ -36,6 +36,8 @@ def BuildDataSet(
     channels = user_config and user_config.get("target_channels") or ["ch1", "ch2", "ch3", "ch4", "ch6"]
     debug = user_config and user_config.get("debug") or False
     with_pass_values = user_config and user_config.get("with_pass_values") or []
+    df_image_column = user_config and user_config.get("df_image_column") or 'hdf5_8bit_path'
+    random_subset_of_days = user_config and user_config.get("random_subset_of_days") or False
 
     def _train_dataset(hdf5_path):
         # get day time index from filename, and iterate through all the day
@@ -45,18 +47,18 @@ def BuildDataSet(
 
         # Load image file
         if not hdf5_path == 'nan' and not hdf5_path == 'NaN' and not hdf5_path == 'NAN':
-            with h5py.File(hdf5_path, "r") as h5_data:
+            with h5py.File(hdf5_path, "r") as h5_data, du.get_previous_day_image_data(hdf5_path) as h5_data_previous_day:
+
+                # get h5 meta info
+                global_start_idx = h5_data.attrs["global_dataframe_start_idx"]
+                global_end_idx = h5_data.attrs["global_dataframe_end_idx"]
+                h5_size = global_end_idx - global_start_idx
+                
+                lats, lons = du.get_lats_lon(h5_data, h5_size)
+                if lats is None or lons is None:
+                    return
 
                 for row_date, row in dataframe_day.iterrows():
-                    # get h5 meta info
-                    global_start_idx = h5_data.attrs["global_dataframe_start_idx"]
-                    global_end_idx = h5_data.attrs["global_dataframe_end_idx"]
-                    h5_size = global_end_idx - global_start_idx
-                    
-                    lats, lons = du.get_lats_lon(h5_data, h5_size)
-                    if lats is None or lons is None:
-                        continue
-
                     # Return one station at a time
                     for station_idx, coords in stations.items():
                         if not du.valid_t0_row(row, station_idx):
@@ -79,7 +81,7 @@ def BuildDataSet(
 
                         # Get image data
                         image_data = du.get_image_transformed(
-                            hdf5_path, h5_data, channels, station_pixel_coords, 
+                            h5_data, h5_data_previous_day, channels, station_pixel_coords, 
                             image_dim, row_date, with_pass_values)
                         if image_data is None:
                             if debug:
@@ -118,7 +120,13 @@ def BuildDataSet(
         return tf.data.Dataset.from_generator(_train_dataset, args=[filename], output_types=(tf.float64, tf.float64, tf.float64))
 
     # Only get dataloaders for image files that exist. 
-    image_files_to_process = dataframe[('hdf5_8bit_path')] [(dataframe['hdf5_8bit_path'].str.contains('nan|NAN|NaN') == False)].unique()
+    image_files_to_process = dataframe[(df_image_column)] [(dataframe[df_image_column].str.contains('nan|NAN|NaN') == False)].unique()
+
+    # we don't want to use the whole dataset, so we subsample it so the model runs faster with the cache
+    np.random.shuffle(image_files_to_process)
+    if random_subset_of_days:
+        if random_subset_of_days < len(image_files_to_process):
+            image_files_to_process = image_files_to_process[:random_subset_of_days]
 
     #   sub sample, take only 20% of the dataset
     image_files_to_process = np.random.choice(image_files_to_process, int(len(image_files_to_process)*0.2))
@@ -156,6 +164,7 @@ class TrainingDataSet(tf.data.Dataset):
             # year 2015 is used as validation set
             dataframe = dataframe[dataframe.index >= datetime.datetime.fromisoformat('2015-01-01 08:00:00')]
             dataframe = dataframe[dataframe.index <= datetime.datetime.fromisoformat('2015-12-31 07:45:00')]
+
 
         target_time_offsets = [pd.Timedelta(d).to_pytimedelta() for d in admin_config["target_time_offsets"]]
         return BuildDataSet(dataframe, stations, target_time_offsets, admin_config, user_config)

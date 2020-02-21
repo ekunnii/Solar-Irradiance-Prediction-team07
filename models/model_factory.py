@@ -35,41 +35,27 @@ class ModelFactory():
 
         # Declare new models here and map builder function to it.
         self.models = {
-            "DummyModel": self.BuildDummyModel,
-            "CNN2D": self.BuildCNN2DModel,
-            "cnn_lstm": self.BuildCNN_LSTM,
-            "pretrained_resnet": self.BuildPretrainedResnet,
-            "resnet": self.BuildResnet,
-            "double_pretrained_resnet": self.BuildDoubleResnet,
-            "CNN3D": self.BuildCNN3DModel
+            'DummyModel': DummyModel,
+            'CNN2D': cnn2d,
+            'cnn_lstm': cnn_lstm,
+            'pretrained_resnet': resnet,
+            'resnet': resnet,
+            'double_pretrained_resnet': double_resnet,
+            'CNN3D': cnn3d,
         }
 
     def build(self, modelName):
-        return self.models[modelName]()
+        if modelName == 'pretrained_resnet':
+            return self.models[modelName](self.target_time_offsets, pretrained=True)
+        elif modelName == 'resnet':
+            return self.models[modelName](self.target_time_offsets, pretrained=False)
+        
+        return self.models[modelName](self.target_time_offsets)
 
-    def BuildDummyModel(self) -> tf.keras.Model:
-        """
-        A model example to test out workflow.
+    def load_model_from_config(self):
+        modelName = self.config.get("model_name") or "DummyModel"
+        print("Loading {model}...")
+        model = self.models[modelName](self.target_time_offsets)
+        return model.load_config(model, self.config)
+    
 
-        Returns:
-            A ``tf.keras.Model`` object that can be used to generate new GHI predictions given imagery tensors.
-        """
-        return DummyModel(self.target_time_offsets)
-
-    def BuildCNN2DModel(self) -> tf.keras.Model:
-        return cnn2d(self.target_time_offsets)
-
-    def BuildPretrainedResnet(self) -> tf.keras.Model:
-        return resnet(self.target_time_offsets, pretrained=True)
-
-    def BuildResnet(self) -> tf.keras.Model:
-        return resnet(self.target_time_offsets, pretrained=False)
-
-    def BuildDoubleResnet(self) -> tf.keras.Model:
-        return double_resnet(self.target_time_offsets)
-
-    def BuildCNN3DModel(self) -> tf.keras.Model:
-        return cnn3d(self.target_time_offsets)
-
-    def BuildCNN_LSTM(self) -> tf.keras.Model:
-        return cnn_lstm(self.target_time_offsets)
