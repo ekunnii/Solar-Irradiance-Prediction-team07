@@ -115,7 +115,7 @@ def preprocess(images, meta_data):
         meta_data = meta_data[:, -2:]
 
     else:
-        images = tf.keras.utils.normalize(images, axis=-1)
+        images = tfk.keras.utils.normalize(images, axis=-1)
 
     return images, meta_data
 
@@ -129,9 +129,9 @@ def train_step(model, optimizer, meta_data, images, labels):
     grads = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
-    if tf.equal(optimizer.iterations % 50, 0):
-        # print('***pred', np.mean(y_pred, axis=0), 'label:', np.mean(labels, axis=0), 'nb prediction 0:', np.sum(y_pred <= 1))
-        print("***predictions: ", y_pred[0].numpy(), "labels", labels[0].numpy())
+    # if tf.equal(optimizer.iterations % 50, 0):
+    #     # print('***pred', np.mean(y_pred, axis=0), 'label:', np.mean(labels, axis=0), 'nb prediction 0:', np.sum(y_pred <= 1))
+    #     print("***predictions: ", y_pred[0].numpy(), "labels", labels[0].numpy())
 
     return loss
 
@@ -175,10 +175,6 @@ def test(model, dataset):
     Perform an evaluation of `model` on the examples from `dataset`.
     """
     valid_avg_loss = metrics.Mean('loss', dtype=tf.float64)
-    before = valid_avg_loss.result()
-    valid_avg_loss.reset_states()
-    after = valid_avg_loss.result()
-    print("Need reset states for val loss?", before, after)
 
     for (meta_data, images, labels) in dataset:
         images, meta_data = preprocess(images, meta_data)
