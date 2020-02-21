@@ -131,9 +131,6 @@ def BuildDataSet(
             np.random.shuffle(image_files_to_process)
             image_files_to_process = image_files_to_process[:random_subset_of_days]
 
-    #   sub sample, take only 20% of the dataset
-    image_files_to_process = np.random.choice(image_files_to_process, int(len(image_files_to_process)*0.2))
-
     # Create an interleaved dataset so it's faster. Each dataset is responsible to load it's own compressed image file.
     files = tf.data.Dataset.from_tensor_slices(image_files_to_process)
     dataset = files.interleave(wrap_generator, num_parallel_calls=tf.data.experimental.AUTOTUNE)
