@@ -103,7 +103,7 @@ def preprocess(images, meta_data):
         # trying with minimalistic meta where only use daytime_flag and clearsky
         meta_data = meta_data[:, -2:]
 
-    elif 'double_pretrained_resnet' == args.model_name or 'resnet' == args.model_name:
+    elif 'double_pretrained_resnet' == args.model_name or 'resnet' == args.model_name or 'double_cnn_lstm' == args.model_name:
 
         images = tf.dtypes.cast(images, np.float32)
         meta_data = tf.dtypes.cast(meta_data, np.float32)
@@ -111,7 +111,7 @@ def preprocess(images, meta_data):
         # meta_data is of shape (nb sample, 9) where the 9 features are:
         # [sin_month,cos_month,sin_minute,cos_minute, lat, lont, alt, daytime_flag, clearsky]
         # trying with minimalistic meta where only use daytime_flag and clearsky
-        meta_data = meta_data[:, -2:]
+        meta_data = tf.convert_to_tensor(meta_data.numpy()[:, [0,1,4,5,6,7,8]])
 
     else:
         images = tf.keras.utils.normalize(images, axis=-1)
@@ -275,31 +275,9 @@ if __name__ == "__main__":
         stations, target_time_offsets, args.user_config)
     model = model_factory.build(args.model_name)
 
-    # print("*******Create training dataset********")
-    # if args.use_cache:
-    #     train_ds = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
-    #         .prefetch(tf.data.experimental.AUTOTUNE) \
-    #         .batch(batch_size) \
-    #         .cache(cache_dir + "/tf_learn_cache") \
-    #         .shuffle(buffer_size)
-    #     valid_ds = TrainingDataSet(data_frame_path, stations, valid_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
-    #         .prefetch(tf.data.experimental.AUTOTUNE) \
-    #         .batch(batch_size) \
-    #         .cache(cache_dir + "/tf_valid_cache") \
-    #         .shuffle(buffer_size)
-    # else:
-    #     train_ds = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
-    #         .prefetch(tf.data.experimental.AUTOTUNE) \
-    #         .batch(batch_size) \
-    #         .shuffle(buffer_size)
-    #     valid_ds = TrainingDataSet(data_frame_path, stations, valid_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
-    #         .prefetch(tf.data.experimental.AUTOTUNE) \
-    #         .batch(batch_size) \
-    #         .shuffle(buffer_size)
-
     train_ds, valid_ds = solar_datasets()
 
-    optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001) #0.00003
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.001) #0.00003
     compute_loss = tf.keras.losses.MSE
 
     # Where to save checkpoints, tensorboard summaries, etc.
@@ -336,8 +314,3 @@ if __name__ == "__main__":
 
         with valid_summary_writer.as_default():
             tf.summary.scalar('RMSE', valid_rmse , step=optimizer.iterations)
-
-
-    # export_path = os.path.join(MODEL_DIR, 'export')
-    # tf.saved_model.save(model, export_path)
-    # print('saved SavedModel for exporting.')

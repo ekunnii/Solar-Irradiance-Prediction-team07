@@ -31,6 +31,6 @@ echo "Calling python train script."
 #stdbuf -oL python -u ./train.py $PWD/train_config.json $PWD/train_config.json -n 10 -m "cnn_lstm" --scratch_dir $SCRATCH --delete_checkpoints --use_cache -s 1234 --user_config user_config.json --save_best
 
 #stdbuf -oL python -u ./train.py $PWD"/train_config.json" -n 30 -m "pretrained_resnet" --run_setting "pretrained resnet50, crop 64, nofreeze" --scratch_dir $SCRATCH --use_cache --load_checkpoints --save_best
-stdbuf -oL python -u ./train.py $PWD"/train_config.json" -n 50 -m "double_cnn_lstm" --run_setting "double cnn lstm, crop 64, dense(500), lstm(128), T0-1h T0-2h" --scratch_dir $SCRATCH --use_cache --user_config user_config.json --save_best --load_checkpoints
+stdbuf -oL python -u ./train.py $PWD"/train_config.json" -n 50 -m "double_cnn_lstm" --run_setting "double cnn double! lstm, full meta, crop 64, lstm(128), T0-1h T0-2h, freeze 50%" --scratch_dir $SCRATCH --use_cache --user_config user_config.json --save_best
 #stdbuf -oL python -u ./test.py
 
