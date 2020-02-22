@@ -19,13 +19,12 @@ class double_cnn_lstm(Model):
         self.avg_pool = TimeDistributed(GlobalAveragePooling2D())
 
         self.d1 = TimeDistributed(Dense(500, activation='relu'))  # nb of channels at the end of a resnet  * 2 + len(metas)
-        # self.d2 = Dense(2048 + 2, activation='relu')
         self.d2 = Dense(len(target_time_offsets), activation="relu")
         self.lstm1 = LSTM(units=128)
 
-    def input_transform(images):
-        if images.shape[1] != 6:
-            return None
+    def input_transform(self, images):
+        # if images.shape[1] != 6:
+        #     return None
 
         # when pretrained, must use the same preprocess as when the model was trained, here preprocess of resnet
         # [batch, past_image, image_size, image_size, channel]
@@ -48,6 +47,8 @@ class double_cnn_lstm(Model):
 
     def call(self, metas, images):
         assert not np.any(np.isnan(images))
+        # if images is None:
+        #     print(None)
 
         images = tf.dtypes.cast(images, np.float32)
         images_1, images_2 = self.input_transform(images) # (Batch size, past images (6), weight, height, nb_channel)
@@ -64,6 +65,6 @@ class double_cnn_lstm(Model):
 
         x = self.d1(x) #(batch_size, past images, 500)
         x = self.lstm1(x)
-        x = tf.concat([x, metas], 1)
+        #x = tf.concat([x, metas], 1)
         x = self.d2(x)
         return x

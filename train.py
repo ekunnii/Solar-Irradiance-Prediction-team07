@@ -202,7 +202,7 @@ if __name__ == "__main__":
                         help="Path of the training config file. This file contains ")
     # parser.add_argument("valid_config", type=str,
     #                     help="Path of the training config file. This file contains ")
-    parser.add_argument("-s", "--seed", type=int, default=1234,
+    parser.add_argument("-s", "--seed", type=int, default=None,
                         help="random seed for training")
     parser.add_argument("-n", "--num_epochs", type=int, default=100,
                         help="Number of epochs we want the model to train")
@@ -250,8 +250,9 @@ if __name__ == "__main__":
 
     print("Starting Training!")
 
-    tf.random.set_seed(args.seed)
-    np.random.seed(args.seed)
+    if args.seed:
+        tf.random.set_seed(args.seed)
+        np.random.seed(args.seed)
 
     # Load configs
     train_json = load_json(args.train_config)
@@ -298,7 +299,7 @@ if __name__ == "__main__":
 
     train_ds, valid_ds = solar_datasets()
 
-    optimizer = tf.keras.optimizers.Adam(learning_rate=0.00005) #0.00003
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001) #0.00003
     compute_loss = tf.keras.losses.MSE
 
     # Where to save checkpoints, tensorboard summaries, etc.
