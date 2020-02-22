@@ -329,6 +329,7 @@ if __name__ == "__main__":
         valid_rmse = test(model, valid_ds)
 
         if args.save_best and valid_rmse < lowest_valid_rmse:
+            lowest_valid_rmse = valid_rmse
             checkpoint.save(best_checkpoint_prefix)
             print('saved best checkpoint.')
 
