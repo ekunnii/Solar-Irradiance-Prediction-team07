@@ -1,9 +1,10 @@
 import tensorflow as tf
 import numpy as np
 from tensorflow.keras.applications.resnet50 import ResNet50
-from tensorflow.keras.layers import Dense, Flatten, GlobalAveragePooling2D, LSTM, TimeDistributed, ConvLSTM2D, BatchNormalization
+from tensorflow.keras.layers import Dense, Flatten, GlobalAveragePooling2D, LSTM, ConvLSTM2D, BatchNormalization
 from tensorflow.keras import Model
 from tensorflow.keras.applications.resnet50 import preprocess_input
+from utils.wrapper import TimeDistributed
 
 
 class double_cnn_lstm(Model):
