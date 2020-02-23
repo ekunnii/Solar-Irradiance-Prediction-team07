@@ -123,9 +123,12 @@ def BuildDataSet(
     image_files_to_process = dataframe[(df_image_column)] [(dataframe[df_image_column].str.contains('nan|NAN|NaN') == False)].unique()
 
     # we don't want to use the whole dataset, so we subsample it so the model runs faster with the cache
-    np.random.shuffle(image_files_to_process)
+
     if random_subset_of_days:
-        if random_subset_of_days < len(image_files_to_process):
+        if random_subset_of_days[-1] == '%': #sub sample, take only % of the dataset
+            image_files_to_process = np.random.choice(image_files_to_process, int(len(image_files_to_process) * int(random_subset_of_days[:-1])/100))
+        elif random_subset_of_days < len(image_files_to_process):
+            np.random.shuffle(image_files_to_process)
             image_files_to_process = image_files_to_process[:random_subset_of_days]
 
     # Create an interleaved dataset so it's faster. Each dataset is responsible to load it's own compressed image file.

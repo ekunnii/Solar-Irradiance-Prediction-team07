@@ -3,7 +3,6 @@ import numpy as np
 from tensorflow.keras.applications.resnet50 import ResNet50
 from tensorflow.keras.layers import Dense, Flatten, GlobalAveragePooling2D, LSTM, TimeDistributed, ConvLSTM2D, BatchNormalization
 from tensorflow.keras import Model
-from tensorflow.keras import Sequential
 from tensorflow.keras.applications.resnet50 import preprocess_input
 
 

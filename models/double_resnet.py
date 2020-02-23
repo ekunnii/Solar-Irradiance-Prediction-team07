@@ -12,8 +12,8 @@ class double_resnet(Model):
         self.resnet50_2 = ResNet50(include_top=False, weights='imagenet', input_shape=(64, 64, 3))
 
         self.avg_pool = GlobalAveragePooling2D()
-        self.d1 = Dense(2048*2+2, activation='relu') #nb of channels at the end of a resnet  * 2 + len(metas)
-        self.d2 = Dense(2048+2, activation='relu')
+        self.d1 = Dense(2048, activation='relu') #nb of channels at the end of a resnet  * 2 + len(metas)
+        self.d2 = Dense(1000, activation='relu')
         self.d3 = Dense(len(target_time_offsets), activation="relu")
 
     def call(self, metas, images):

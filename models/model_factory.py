@@ -8,6 +8,7 @@ from models.resnet import resnet
 from models.double_resnet import double_resnet
 from models.cnn3d import cnn3d
 from models.cnn_lstm import cnn_lstm
+from models.double_cnn_lstm import double_cnn_lstm
 import tensorflow as tf
 
 
@@ -38,6 +39,7 @@ class ModelFactory():
             'DummyModel': DummyModel,
             'CNN2D': cnn2d,
             'cnn_lstm': cnn_lstm,
+            'double_cnn_lstm': double_cnn_lstm,
             'pretrained_resnet': resnet,
             'resnet': resnet,
             'double_pretrained_resnet': double_resnet,

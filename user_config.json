@@ -8,7 +8,7 @@
     ],
     "df_image_column": "hdf5_8bit_path",
 
-    "random_subset_of_days": 250,
+    "random_subset_of_days": "20%",
 
     "model_name": "CNN3D", 
     "cnn3d": {
