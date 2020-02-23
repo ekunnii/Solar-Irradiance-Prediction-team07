@@ -38,6 +38,8 @@ def BuildDataSet(
     with_pass_values = user_config and user_config.get("with_pass_values") or []
     df_image_column = user_config and user_config.get("df_image_column") or 'hdf5_8bit_path'
     random_subset_of_days = user_config and user_config.get("random_subset_of_days") or False
+    # get localtimezone
+    station_timezones = utils.get_station_timezone(stations)
 
     def _train_dataset(hdf5_path):
         # get day time index from filename, and iterate through all the day
@@ -71,9 +73,10 @@ def BuildDataSet(
 
                         # get meta info
                         lat, lont, alt = stations[station_idx] #lat, lont, alt
-                        # Warning, encoding of hours/minutes doesn't take into account the actual time according
-                        # to the different timezone of the different stations?
-                        sin_month,cos_month,sin_minute,cos_minute = utils.convert_time(row.name) #encoding months and hour/minutes
+                        # Encoding of hours/minutes take into account the local time according
+                        # to the different timezone of the different stations
+                        sin_month, cos_month, sin_minute, cos_minute = utils.convert_time(
+                            row.name, station_timezones, station_idx)  # encoding months and hour/minutes
                         daytime_flag, clearsky, _, __ = row.loc[row.index.str.startswith(station_idx)]
 
                         meta_array = np.array([sin_month,cos_month,sin_minute,cos_minute,

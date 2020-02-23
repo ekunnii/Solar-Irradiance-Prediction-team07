@@ -12,4 +12,6 @@ env
 *.log
 checkpoints
 logs
+*.sav 
+*.csv
 
