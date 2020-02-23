@@ -143,15 +143,8 @@ def train(model, optimizer, dataset, log_freq=1000):
     # Metrics are stateful. They accumulate values and return a cumulative
     # result when you call .result(). Clear accumulated values with .reset_states()
     train_avg_loss = metrics.Mean('loss', dtype=tf.float64)
-    log_transform = False
     # Datasets can be iterated over like any other Python iterable.
     for (meta_data, images, labels) in dataset:
-        if log_transform:
-            images = tf.clip_by_value(
-                images/255.0, clip_value_min=0, clip_value_max=5)
-            labels = tf.clip_by_value(
-                tf.math.log(labels+1), clip_value_min = 0, clip_value_max = 20)
-
         loss = train_step(model, optimizer, meta_data, images, labels)
         train_avg_loss(loss)
 
@@ -301,9 +294,6 @@ if __name__ == "__main__":
 
     for i in range(args.num_epochs):
         train(model, optimizer, train_ds, log_freq=100)
-        end = time.time()
-        print('Epoch #{} ({} total steps): {}sec'.format(i + 1, int(optimizer.iterations), end - start))
-
         checkpoint.save(checkpoint_prefix)
         print('saved checkpoint.')
 
