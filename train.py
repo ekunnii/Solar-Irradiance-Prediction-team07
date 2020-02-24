@@ -111,7 +111,9 @@ def preprocess(images, meta_data):
         # meta_data is of shape (nb sample, 9) where the 9 features are:
         # [sin_month,cos_month,sin_minute,cos_minute, lat, lont, alt, daytime_flag, clearsky]
         # trying with minimalistic meta where only use daytime_flag and clearsky
-        meta_data = tf.convert_to_tensor(meta_data.numpy()[:, [0,1,4,5,6,7,8]])
+        # meta_data = tf.convert_to_tensor(meta_data.numpy()[:, [0,1,4,5,6,7,8]])
+        meta_data = meta_data[:, -2:]
+
 
     else:
         images = tf.keras.utils.normalize(images, axis=-1)
@@ -277,7 +279,7 @@ if __name__ == "__main__":
 
     train_ds, valid_ds = solar_datasets()
 
-    optimizer = tf.keras.optimizers.Adam(learning_rate=0.001) #0.00003
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.00005) #0.00003
     compute_loss = tf.keras.losses.MSE
 
     # Where to save checkpoints, tensorboard summaries, etc.
