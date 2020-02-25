@@ -74,8 +74,7 @@ def solar_datasets():
                                  train=False, scratch_dir=args.scratch_dir) \
             .prefetch(tf.data.experimental.AUTOTUNE) \
             .batch(batch_size) \
-            .cache(cache_dir + "/tf_learn_cache") \
-            .shuffle(buffer_size)
+            .cache(cache_dir + "/tf_learn_cache")
     else:
         train_ds = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json,
                                    scratch_dir=args.scratch_dir) \
@@ -86,8 +85,7 @@ def solar_datasets():
         valid_ds = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json,
                                    train=False, scratch_dir=args.scratch_dir) \
             .prefetch(tf.data.experimental.AUTOTUNE) \
-            .batch(batch_size) \
-            .shuffle(buffer_size)
+            .batch(batch_size)
 
     return train_ds, valid_ds
 
@@ -128,12 +126,36 @@ def train_step(model, optimizer, meta_data, images, labels):
     grads = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
-    # if tf.equal(optimizer.iterations % 50, 0):
-    #     # print('***pred', np.mean(y_pred, axis=0), 'label:', np.mean(labels, axis=0), 'nb prediction 0:', np.sum(y_pred <= 1))
-    #     print("***predictions: ", y_pred[0].numpy(), "labels", labels[0].numpy())
+    if tf.equal(optimizer.iterations % 100, 0):
+        # print('***pred', np.mean(y_pred, axis=0), 'label:', np.mean(labels, axis=0), 'nb prediction 0:', np.sum(y_pred <= 1))
+        print("***predictions: ", y_pred[10].numpy(), "labels", labels[10].numpy())
 
     return loss
 
+# train steps for seq2seq
+@tf.function
+def train_step_seq2seq(encoder, decoder, optimizer, meta_data, images, labels):
+    loss = 0
+    images, meta_data = preprocess(images, meta_data)
+
+    with tf.GradientTape() as tape:
+        enc_output, enc_hidden = encoder(images)
+        dec_hidden = enc_hidden
+        dec_input = tf.expand_dims([targ_lang.word_index['<start>']] * BATCH_SIZE, 1)
+
+        # Teacher forcing - feeding the target as the next input
+        for t in range(1, len(target_time_offsets)):
+            # passing enc_output to the decoder
+            y_pred, dec_hidden, _ = decoder(dec_input, dec_hidden, enc_output)
+        loss += compute_loss(labels[:, t], y_pred)
+        # using teacher forcing
+        dec_input = tf.expand_dims(labels[:, t], 1)
+
+    variables = encoder.trainable_variables + decoder.trainable_variables
+    gradients = tape.gradient(loss, variables)
+    optimizer.apply_gradients(zip(gradients, variables))
+
+    return loss
 
 def train(model, optimizer, dataset, log_freq=1000):
     """

@@ -16,6 +16,8 @@ pip install /project/cq-training-1/project1/teams/team07/lz4-3.0.2-cp37-cp37m-li
 pip install --no-index opencv-python
 pip install --no-index matplotlib
 pip install --no-index tqdm
+pip install --no-index pytz
+pip install /project/cq-training-1/project1/teams/team07/timezonefinder-4.2.0-py3-none-any.whl
 
 echo ""
 echo "Calling python eval script."

@@ -45,8 +45,9 @@ class cnn_seq2seq(Model):
         images = self.input_transform(images)
         # [sin_month,cos_month,sin_minute,cos_minute, lat, lont, alt, daytime_flag, clearsky]
         # use alt as station_idx
+        metas = metas.numpy()
         metas[:, 6] /=1689
-        metas = tf.convert_to_tensor(metas.numpy()[:, [0,1,2,3,6,7]])
+        metas = tf.convert_to_tensor(metas[:, [0,1,2,3,6,7]])
         
         x = self.resnet50(images)
         x = self.avg_pool(x)  # transform to (nb of sample, nb of channel)
