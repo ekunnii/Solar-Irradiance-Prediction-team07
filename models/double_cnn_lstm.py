@@ -16,12 +16,12 @@ class double_cnn_lstm(Model):
         # self.resnet50_2 = TimeDistributed(ResNet50(include_top=False, weights='imagenet', input_shape=(64, 64, 3)))
 
         self.resnet50_1 = ResNet50(include_top=False, weights='imagenet', input_shape=(64, 64, 3))
-        for layer in self.resnet50_1.layers[:93]:  # freeze 50%
+        for layer in self.resnet50_1.layers[:103]:  # freeze 60%
             layer.trainable = False
         self.resnet50_1 = TimeDistributed(self.resnet50_1)
 
         self.resnet50_2 = ResNet50(include_top=False, weights='imagenet', input_shape=(64, 64, 3))
-        for layer in self.resnet50_2.layers[:93]:  # freeze 50%
+        for layer in self.resnet50_2.layers[:103]:  # freeze 60%
             layer.trainable = False
         self.resnet50_2 = TimeDistributed(self.resnet50_2)
 
@@ -29,8 +29,8 @@ class double_cnn_lstm(Model):
 
         #self.d1 = TimeDistributed(Dense(500, activation='relu'))  # nb of channels at the end of a resnet  * 2 + len(metas)
         self.d2 = Dense(len(target_time_offsets), activation="relu")
-        self.lstm1 = LSTM(units=128)
-        self.lstm2 = LSTM(units=128)
+        self.lstm1 = LSTM(units=64)
+        self.lstm2 = LSTM(units=64)
 
     def input_transform(self, images):
         # if images.shape[1] != 6:
@@ -39,12 +39,12 @@ class double_cnn_lstm(Model):
         # when pretrained, must use the same preprocess as when the model was trained, here preprocess of resnet
         # [batch, past_image, image_size, image_size, channel]
         batch_size = images.shape[0]
-        image_size =  images.shape[2] # assume square images
+        image_size = images.shape[2] # assume square images
 
         images = tf.reshape(images, [-1, image_size, image_size, 5])
 
-        images_1 = tf.convert_to_tensor(images.numpy()[:,:,:,[0,2,4]])
-        images_2 = tf.convert_to_tensor(images.numpy()[:,:,:,[1,2,3]])
+        images_1 = tf.convert_to_tensor(images.numpy()[:, :, :, [0, 2, 4]])
+        images_2 = tf.convert_to_tensor(images.numpy()[:, :, :, [1, 2, 3]])
 
         images_1 = preprocess_input(images_1)
         images_2 = preprocess_input(images_2)
