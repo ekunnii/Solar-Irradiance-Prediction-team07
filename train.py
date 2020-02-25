@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import pdb
 import time
 import numpy as np
+import cProfile
 
 from models.model_factory import ModelFactory
 from dataloader.dataset import TrainingDataSet
@@ -74,7 +75,7 @@ def solar_datasets():
                                  train=False, scratch_dir=args.scratch_dir) \
             .prefetch(tf.data.experimental.AUTOTUNE) \
             .batch(batch_size) \
-            .cache(cache_dir + "/tf_learn_cache") \
+            .cache(cache_dir + "/tf_learn_cache_valid") \
             .shuffle(buffer_size)
     else:
         train_ds = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json,
@@ -147,6 +148,7 @@ def train(model, optimizer, dataset, log_freq=1000):
     train_avg_loss = metrics.Mean('loss', dtype=tf.float64)
     log_transform = False
     # Datasets can be iterated over like any other Python iterable.
+    #cProfile.runctx('next(dataset.__iter__())', {}, {'dataset': dataset})
     for (meta_data, images, labels) in dataset:
         if log_transform:
             images = tf.clip_by_value(
@@ -302,8 +304,10 @@ if __name__ == "__main__":
     valid_avg_loss = metrics.Mean('loss', dtype=tf.float32)
 
     for i in range(args.num_epochs):
+        start = time.time()
         train(model, optimizer, train_ds, log_freq=100)
-
+        if not os.path.exists(checkpoint_prefix):
+            os.makedirs(checkpoint_prefix)
         checkpoint.save(checkpoint_prefix)
         print('saved checkpoint.')
 
@@ -311,6 +315,8 @@ if __name__ == "__main__":
 
         if args.save_best and valid_rmse < lowest_valid_rmse:
             lowest_valid_rmse = valid_rmse
+            if not os.path.exists(best_checkpoint_prefix):
+                os.makedirs(best_checkpoint_prefix)
             checkpoint.save(best_checkpoint_prefix)
             print('saved best checkpoint.')
 
