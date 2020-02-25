@@ -25,6 +25,8 @@ def evaluation_dataset(
     image_dim = user_config and user_config.get("image_dim") or 64
     channels = user_config and user_config.get("target_channels") or ["ch1", "ch2", "ch3", "ch4", "ch6"]
     with_pass_values = user_config and user_config.get("with_pass_values") or []
+    # get localtimezone
+    station_timezones = utils.get_station_timezone(stations)
 
     def _eval_dataset():
 
@@ -52,14 +54,14 @@ def evaluation_dataset(
 
                     # get meta info
                     lat, lont, alt = stations[station_idx] #lat, lont, alt
-                    # Warning, encoding of hours/minutes doesn't take into account the actual time according
-                    # to the different timezone of the different stations?
-                    sin_month,cos_month,sin_minute,cos_minute = utils.convert_time(row.name) #encoding months and hour/minutes
+                    # Encoding of hours/minutes take into account the local time according
+                        # to the different timezone of the different stations
+                    sin_month, cos_month, sin_minute, cos_minute = utils.convert_time(row.name, station_timezones, station_idx)  # encoding months and hour/minutes
+
                     daytime_flag, clearsky, _, __ = row.loc[row.index.str.startswith(station_idx)]
 
                     meta_array = np.array([sin_month,cos_month,sin_minute,cos_minute,
                                             lat, lont, alt, daytime_flag, clearsky], dtype=np.float64)
-
                     # Get image data
                     image_data = du.get_image_transformed(
                         h5_data, h5_data_previous_day, channels, station_pixel_coords, 

@@ -60,7 +60,6 @@ def apply_clean(dirname):
 def solar_datasets():
     """
     train and valid split
-
     """
     print("*******Create training dataset********")
     if args.use_cache:
@@ -75,8 +74,7 @@ def solar_datasets():
                                  train=False, scratch_dir=args.scratch_dir) \
             .prefetch(tf.data.experimental.AUTOTUNE) \
             .batch(batch_size) \
-            .cache(cache_dir + "/tf_learn_cache") \
-            .shuffle(buffer_size)
+            .cache(cache_dir + "/tf_learn_cache")
     else:
         train_ds = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json,
                                    scratch_dir=args.scratch_dir) \
@@ -87,8 +85,7 @@ def solar_datasets():
         valid_ds = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json,
                                    train=False, scratch_dir=args.scratch_dir) \
             .prefetch(tf.data.experimental.AUTOTUNE) \
-            .batch(batch_size) \
-            .shuffle(buffer_size)
+            .batch(batch_size)
 
     return train_ds, valid_ds
 
@@ -104,7 +101,7 @@ def preprocess(images, meta_data):
         # trying with minimalistic meta where only use daytime_flag and clearsky
         meta_data = meta_data[:, -2:]
 
-    elif 'double_pretrained_resnet' == args.model_name or 'resnet' == args.model_name:
+    elif 'double_pretrained_resnet' == args.model_name or 'resnet' == args.model_name or 'double_cnn_lstm' == args.model_name:
 
         images = tf.dtypes.cast(images, np.float32)
         meta_data = tf.dtypes.cast(meta_data, np.float32)
@@ -112,7 +109,7 @@ def preprocess(images, meta_data):
         # meta_data is of shape (nb sample, 9) where the 9 features are:
         # [sin_month,cos_month,sin_minute,cos_minute, lat, lont, alt, daytime_flag, clearsky]
         # trying with minimalistic meta where only use daytime_flag and clearsky
-        meta_data = meta_data[:, -2:]
+        meta_data = tf.convert_to_tensor(meta_data.numpy()[:, [0,1,4,5,6,7,8]])
 
     else:
         images = tf.keras.utils.normalize(images, axis=-1)
@@ -129,29 +126,47 @@ def train_step(model, optimizer, meta_data, images, labels):
     grads = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
-    if tf.equal(optimizer.iterations % 50, 0):
+    if tf.equal(optimizer.iterations % 100, 0):
         # print('***pred', np.mean(y_pred, axis=0), 'label:', np.mean(labels, axis=0), 'nb prediction 0:', np.sum(y_pred <= 1))
-        print("***predictions: ", y_pred[0].numpy(), "labels", labels[0].numpy())
+        print("***predictions: ", y_pred[10].numpy(), "labels", labels[10].numpy())
 
     return loss
 
+# train steps for seq2seq
+@tf.function
+def train_step_seq2seq(encoder, decoder, optimizer, meta_data, images, labels):
+    loss = 0
+    images, meta_data = preprocess(images, meta_data)
+
+    with tf.GradientTape() as tape:
+        enc_output, enc_hidden = encoder(images)
+        dec_hidden = enc_hidden
+        dec_input = tf.expand_dims([targ_lang.word_index['<start>']] * BATCH_SIZE, 1)
+
+        # Teacher forcing - feeding the target as the next input
+        for t in range(1, len(target_time_offsets)):
+            # passing enc_output to the decoder
+            y_pred, dec_hidden, _ = decoder(dec_input, dec_hidden, enc_output)
+        loss += compute_loss(labels[:, t], y_pred)
+        # using teacher forcing
+        dec_input = tf.expand_dims(labels[:, t], 1)
+
+    variables = encoder.trainable_variables + decoder.trainable_variables
+    gradients = tape.gradient(loss, variables)
+    optimizer.apply_gradients(zip(gradients, variables))
+
+    return loss
 
 def train(model, optimizer, dataset, log_freq=1000):
     """
     Trains model on `dataset` using `optimizer`.
     """
+    start = time.time()
     # Metrics are stateful. They accumulate values and return a cumulative
     # result when you call .result(). Clear accumulated values with .reset_states()
     train_avg_loss = metrics.Mean('loss', dtype=tf.float64)
-    log_transform = False
     # Datasets can be iterated over like any other Python iterable.
     for (meta_data, images, labels) in dataset:
-        if log_transform:
-            images = tf.clip_by_value(
-                images/255.0, clip_value_min=0, clip_value_max=5)
-            labels = tf.clip_by_value(
-                tf.math.log(labels+1), clip_value_min = 0, clip_value_max = 20)
-
         loss = train_step(model, optimizer, meta_data, images, labels)
         train_avg_loss(loss)
 
@@ -164,6 +179,9 @@ def train(model, optimizer, dataset, log_freq=1000):
                 tf.summary.scalar('RMSE', np.sqrt(
                     train_avg_loss.result().numpy()), step=optimizer.iterations)
             train_avg_loss.reset_states()
+
+    end = time.time()
+    print('Epoch #{} ({} total steps): {}sec'.format(i + 1, int(optimizer.iterations), end - start))
 
 
 def test(model, dataset):
@@ -199,7 +217,7 @@ if __name__ == "__main__":
                         help="Path of the training config file. This file contains ")
     # parser.add_argument("valid_config", type=str,
     #                     help="Path of the training config file. This file contains ")
-    parser.add_argument("-s", "--seed", type=int, default=1234,
+    parser.add_argument("-s", "--seed", type=int, default=None,
                         help="random seed for training")
     parser.add_argument("-n", "--num_epochs", type=int, default=100,
                         help="Number of epochs we want the model to train")
@@ -247,8 +265,9 @@ if __name__ == "__main__":
 
     print("Starting Training!")
 
-    tf.random.set_seed(args.seed)
-    np.random.seed(args.seed)
+    if args.seed:
+        tf.random.set_seed(args.seed)
+        np.random.seed(args.seed)
 
     # Load configs
     train_json = load_json(args.train_config)
@@ -271,31 +290,9 @@ if __name__ == "__main__":
         stations, target_time_offsets, args.user_config)
     model = model_factory.build(args.model_name)
 
-    # print("*******Create training dataset********")
-    # if args.use_cache:
-    #     train_ds = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
-    #         .prefetch(tf.data.experimental.AUTOTUNE) \
-    #         .batch(batch_size) \
-    #         .cache(cache_dir + "/tf_learn_cache") \
-    #         .shuffle(buffer_size)
-    #     valid_ds = TrainingDataSet(data_frame_path, stations, valid_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
-    #         .prefetch(tf.data.experimental.AUTOTUNE) \
-    #         .batch(batch_size) \
-    #         .cache(cache_dir + "/tf_valid_cache") \
-    #         .shuffle(buffer_size)
-    # else:
-    #     train_ds = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
-    #         .prefetch(tf.data.experimental.AUTOTUNE) \
-    #         .batch(batch_size) \
-    #         .shuffle(buffer_size)
-    #     valid_ds = TrainingDataSet(data_frame_path, stations, valid_json, user_config=user_config_json, scratch_dir=args.scratch_dir) \
-    #         .prefetch(tf.data.experimental.AUTOTUNE) \
-    #         .batch(batch_size) \
-    #         .shuffle(buffer_size)
-
     train_ds, valid_ds = solar_datasets()
 
-    optimizer = tf.keras.optimizers.Adam(learning_rate=0.00005) #0.00003
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.001) #0.00003
     compute_loss = tf.keras.losses.MSE
 
     # Where to save checkpoints, tensorboard summaries, etc.
@@ -317,25 +314,17 @@ if __name__ == "__main__":
 
     valid_avg_loss = metrics.Mean('loss', dtype=tf.float32)
 
-    for i in range(args.num_epochs):       
-        start = time.time()
+    for i in range(args.num_epochs):
         train(model, optimizer, train_ds, log_freq=100)
-        end = time.time()
-        print('Epoch #{} ({} total steps): {}sec'.format(i + 1, int(optimizer.iterations), end - start))
-
         checkpoint.save(checkpoint_prefix)
         print('saved checkpoint.')
 
         valid_rmse = test(model, valid_ds)
 
         if args.save_best and valid_rmse < lowest_valid_rmse:
+            lowest_valid_rmse = valid_rmse
             checkpoint.save(best_checkpoint_prefix)
             print('saved best checkpoint.')
 
         with valid_summary_writer.as_default():
             tf.summary.scalar('RMSE', valid_rmse , step=optimizer.iterations)
-
-
-    # export_path = os.path.join(MODEL_DIR, 'export')
-    # tf.saved_model.save(model, export_path)
-    # print('saved SavedModel for exporting.')

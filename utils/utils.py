@@ -16,7 +16,9 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 import tqdm
-
+from timezonefinder import TimezoneFinder
+import datetime
+import pytz
 
 def get_label_color_mapping(idx):
     """Returns the PASCAL VOC color triplet for a given label index."""
@@ -868,24 +870,43 @@ def process_df(df,big_gap=6):
         df[f"{stat}_data_avail_day"] = df[f"{stat}_data_avail"]*df[f"{stat}_DAYTIME"]
     return df    
             
+
+def get_station_timezone(stations):
+    station_timezone = {}
+    for station_name in stations.keys():
+        tf = TimezoneFinder()
+    #     latitude, longitude = 52.5061, 13.358
+        latitude, longitude = stations[station_name][0], stations[station_name][1]
+        timezone = tf.timezone_at(lng=longitude, lat=latitude)
+        station_timezone[station_name] = pytz.timezone(timezone)
+    return station_timezone
             
-            
-def convert_time(timestamp):
+
+def convert_time(timestamp, station_timezone, station_name):
     """
     Take the hour/minute and month of the timestamp and convert them to a 
     sin/cos vector to better represent the similarity between January (1)
     and December (12) or 23h45 and 00h00
     This function can take a string (json file) or a timestamp object (pd dataframe)
     """
+    fmt = "%Y-%m-%d %H:%M:%S"
+
     try:
-        date = datetime.datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S")
+        timestamp = str(timestamp)
+        utc_time = datetime.datetime.strptime(timestamp, fmt).replace(tzinfo=pytz.utc)
     except TypeError:
-        date = timestamp
+        utc_time = timestamp
+
+    tz = station_timezone[station_name]
+    local_datetime = utc_time.astimezone(tz)
+    
     min15_in_day = 24*4
-    sin_month = np.sin(2*np.pi*date.month/12)
-    cos_month = np.cos(2*np.pi*date.month/12)
-    sin_minute = np.sin(2*np.pi*(date.hour*4+date.minute/15)/min15_in_day)
-    cos_minute = np.cos(2*np.pi*(date.hour*4+date.minute/15)/min15_in_day)
+    sin_month = np.sin(2*np.pi*local_datetime.month/12)
+    cos_month = np.cos(2*np.pi*local_datetime.month/12)
+    sin_minute = np.sin(2*np.pi*(local_datetime.hour*4 +
+                                 local_datetime.minute/15)/min15_in_day)
+    cos_minute = np.cos(2*np.pi*(local_datetime.hour *
+                                 4+local_datetime.minute/15)/min15_in_day)
     return (sin_month,cos_month,sin_minute,cos_minute)
 
 if __name__ == "__main__":
@@ -893,7 +914,9 @@ if __name__ == "__main__":
     # img_data = fetch_and_crop_hdf5_imagery(hdf5_path, target_channels, stations, dataframe_path, cropped_img_size=cropped_img_size, visualize=True)
     # print(img_data.shape)
 
-    df, imgs = get_data("../data/catalog.helios.public.20100101-20160101_updated.pkl", "2011-12-01", "2011-12-04")
+    df, imgs = get_data(
+        "/project/cq-training-1/project1/data/catalog.helios.public.20100101-20160101.pkl", "2011-12-01", "2011-12-04")
+
     print('Dataframe', df.shape, 'Images',imgs.shape)
 
     a_datetime = datetime.datetime.fromisoformat("2011-12-03 13:45:00")

@@ -16,21 +16,30 @@ pip install /project/cq-training-1/project1/teams/team07/lz4-3.0.2-cp37-cp37m-li
 pip install --no-index opencv-python
 pip install --no-index matplotlib
 pip install --no-index tqdm
+pip install --no-index pytz
+pip install /project/cq-training-1/project1/teams/team07/timezonefinder-4.2.0-py3-none-any.whl
 
 cp -ru /project/cq-training-1/project1/teams/team07/.keras ~/
 
 # python --version
 # which python
 # which pip
-# pip freeze
+pip freeze
 
 echo ""
 echo "Calling python train script."
-stdbuf -oL python -u ./train.py $PWD/train_config.json $PWD/train_config.json -n 10 -m "CNN2D" --scratch_dir $SCRATCH --delete_checkpoints --use_cache -s 123
-stdbuf -oL python -u ./train.py $PWD/train_config.json $PWD/train_config.json -n 10 -m "pretrained_resnet" --scratch_dir $SCRATCH --delete_checkpoints --use_cache -s 123
-stdbuf -oL python -u ./train.py $PWD/train_config.json $PWD/train_config.json -n 10 -m "cnn_lstm" --scratch_dir $SCRATCH --delete_checkpoints --use_cache -s 1234 --user_config user_config.json --save_best
+#stdbuf -oL python -u ./train.py $PWD/train_config.json $PWD/train_config.json -n 10 -m "CNN2D" --scratch_dir $SCRATCH --delete_checkpoints --use_cache -s 123
+#stdbuf -oL python -u ./train.py $PWD/train_config.json $PWD/train_config.json -n 10 -m "pretrained_resnet" --scratch_dir $SCRATCH --delete_checkpoints --use_cache -s 123
+#stdbuf -oL python -u ./train.py $PWD/train_config.json $PWD/train_config.json -n 10 -m "cnn_lstm" --scratch_dir $SCRATCH --delete_checkpoints --use_cache -s 1234 --user_config user_config.json --save_best
 
-stdbuf -oL python -u ./train.py $PWD"/train_config.json" -n 200 -m "double_pretrained_resnet" --run_setting "double pretrained resnet50, crop 64, nofreeze" --scratch_dir $SCRATCH --load_checkpoints
-stdbuf -oL python -u ./train.py $PWD"/train_config.json" -n 200 -m "cnn_lstm" --run_setting "cnn_lstm_100_epochs_test"  -s 1234 --user_config user_config.json --save_best --use_cache
-stdbuf -oL python -u ./test.py
-
+#stdbuf -oL python -u ./train.py $PWD"/train_config.json" -n 200 -m "double_pretrained_resnet" --run_setting "double pretrained resnet50, crop 64, nofreeze" --scratch_dir $SCRATCH --load_checkpoints
+#stdbuf -oL python -u ./train.py $PWD"/train_config.json" -n 200 -m "cnn_lstm" --run_setting "cnn_lstm_100_epochs_test"  -s 1234 --user_config user_config.json --save_best --use_cache
+#stdbuf -oL python -u ./train.py $PWD"/train_config.json" -n 30 -m "pretrained_resnet" --run_setting "pretrained resnet50, crop 64, nofreeze" --scratch_dir $SCRATCH --use_cache --load_checkpoints --save_best
+# stdbuf -oL python -u ./train.py $PWD"/train_config.json" -n 50 -m "double_cnn_lstm" --run_setting "double cnn double! lstm, full meta, crop 64, lstm(128), T0-1h T0-2h, freeze 50%" --scratch_dir $SCRATCH --use_cache --user_config user_config.json --save_best
+stdbuf -oL python -u ./train.py $PWD"/train_config.json" \
+-n 50 -m "cnn_seq2seq" \
+--run_setting "cnn_seq2seq-gru(256), partial meta, crop 64, output dropout(0.5) T0-30m T0-1h, T0-1h30m" \
+--scratch_dir $SCRATCH \
+--user_config user_config.json \
+--save_best \
+--use_cache
