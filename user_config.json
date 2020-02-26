@@ -15,5 +15,10 @@
     "model_name": "CNN3D", 
     "cnn3d": {
         "model_path": "C:/Users/Game/AI/ProjectClass/Solar-Irradiance-Prediction-team07/models/cnn3d good model"
+    },
+
+    "model_name": "double_pretrained_resnet",
+    "double_pretrained_resnet": {
+        "model_path": "/project/cq-training-1/project1/teams/team07/goodmodels/double_pretrained_resnet"
     }
 }
