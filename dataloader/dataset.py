@@ -129,7 +129,10 @@ def BuildDataSet(
 
     if random_subset_of_days:
         if random_subset_of_days[-1] == '%': #sub sample, take only % of the dataset
+            print('subsample', len(image_files_to_process),
+                  int(len(image_files_to_process) * int(random_subset_of_days[:-1]) / 100))
             image_files_to_process = np.random.choice(image_files_to_process, int(len(image_files_to_process) * int(random_subset_of_days[:-1])/100))
+            print(len(image_files_to_process))
         elif random_subset_of_days < len(image_files_to_process):
             np.random.shuffle(image_files_to_process)
             image_files_to_process = image_files_to_process[:random_subset_of_days]
@@ -167,6 +170,7 @@ class TrainingDataSet(tf.data.Dataset):
             # year 2015 is used as validation set
             dataframe = dataframe[dataframe.index >= datetime.datetime.fromisoformat('2015-01-01 08:00:00')]
             dataframe = dataframe[dataframe.index <= datetime.datetime.fromisoformat('2015-12-31 07:45:00')]
+            #dataframe = dataframe[dataframe.index <= datetime.datetime.fromisoformat('2015-01-27 07:45:00')]
 
 
         target_time_offsets = [pd.Timedelta(d).to_pytimedelta() for d in admin_config["target_time_offsets"]]

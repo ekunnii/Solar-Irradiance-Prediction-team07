@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import pdb
 import time
 import numpy as np
+import cProfile
 
 from models.model_factory import ModelFactory
 from dataloader.dataset import TrainingDataSet
@@ -74,7 +75,8 @@ def solar_datasets():
                                  train=False, scratch_dir=args.scratch_dir) \
             .prefetch(tf.data.experimental.AUTOTUNE) \
             .batch(batch_size) \
-            .cache(cache_dir + "/tf_learn_cache")
+            .cache(cache_dir + "/tf_learn_cache_valid") \
+            .shuffle(buffer_size)
     else:
         train_ds = TrainingDataSet(data_frame_path, stations, train_json, user_config=user_config_json,
                                    scratch_dir=args.scratch_dir) \
@@ -109,7 +111,9 @@ def preprocess(images, meta_data):
         # meta_data is of shape (nb sample, 9) where the 9 features are:
         # [sin_month,cos_month,sin_minute,cos_minute, lat, lont, alt, daytime_flag, clearsky]
         # trying with minimalistic meta where only use daytime_flag and clearsky
-        meta_data = tf.convert_to_tensor(meta_data.numpy()[:, [0,1,4,5,6,7,8]])
+        # meta_data = tf.convert_to_tensor(meta_data.numpy()[:, [0,1,4,5,6,7,8]])
+        meta_data = meta_data[:, -2:]
+
 
     else:
         images = tf.keras.utils.normalize(images, axis=-1)
@@ -122,7 +126,11 @@ def train_step(model, optimizer, meta_data, images, labels):
     # of the loss with respect to the variables can be computed.
     with tf.GradientTape() as tape:
         y_pred = model(meta_data, images, training=True)
-        loss = compute_loss(labels, y_pred)   
+        loss = compute_loss(labels, y_pred)
+
+    # print(model.summary())
+    # import sys
+    # sys.exit()
     grads = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
@@ -166,6 +174,7 @@ def train(model, optimizer, dataset, log_freq=1000):
     # result when you call .result(). Clear accumulated values with .reset_states()
     train_avg_loss = metrics.Mean('loss', dtype=tf.float64)
     # Datasets can be iterated over like any other Python iterable.
+    #cProfile.runctx('next(dataset.__iter__())', {}, {'dataset': dataset})
     for (meta_data, images, labels) in dataset:
         loss = train_step(model, optimizer, meta_data, images, labels)
         train_avg_loss(loss)
@@ -271,7 +280,7 @@ if __name__ == "__main__":
 
     # Load configs
     train_json = load_json(args.train_config)
-    # valid_json = load_json(args.valid_config)  
+    # valid_json = load_json(args.valid_config)
 
     user_config_json = None
     if args.user_config:
@@ -292,7 +301,7 @@ if __name__ == "__main__":
 
     train_ds, valid_ds = solar_datasets()
 
-    optimizer = tf.keras.optimizers.Adam(learning_rate=0.001) #0.00003
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001) #0.00003
     compute_loss = tf.keras.losses.MSE
 
     # Where to save checkpoints, tensorboard summaries, etc.
@@ -315,7 +324,14 @@ if __name__ == "__main__":
     valid_avg_loss = metrics.Mean('loss', dtype=tf.float32)
 
     for i in range(args.num_epochs):
+        start = time.time()
         train(model, optimizer, train_ds, log_freq=100)
+        end = time.time()
+        print('Epoch #{} ({} total steps): {}sec'.format(i + 1, int(optimizer.iterations), end - start))
+
+        if not os.path.exists(checkpoint_prefix):
+            os.makedirs(checkpoint_prefix)
+
         checkpoint.save(checkpoint_prefix)
         print('saved checkpoint.')
 
@@ -323,6 +339,8 @@ if __name__ == "__main__":
 
         if args.save_best and valid_rmse < lowest_valid_rmse:
             lowest_valid_rmse = valid_rmse
+            if not os.path.exists(best_checkpoint_prefix):
+                os.makedirs(best_checkpoint_prefix)
             checkpoint.save(best_checkpoint_prefix)
             print('saved best checkpoint.')
 

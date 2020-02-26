@@ -59,6 +59,8 @@ def evaluation_dataset(
                     sin_month, cos_month, sin_minute, cos_minute = utils.convert_time(row.name, station_timezones, station_idx)  # encoding months and hour/minutes
 
                     daytime_flag, clearsky, _, __ = row.loc[row.index.str.startswith(station_idx)]
+                    if clearsky.isnull():
+                        clearsky = 200 # close to average value
 
                     meta_array = np.array([sin_month,cos_month,sin_minute,cos_minute,
                                             lat, lont, alt, daytime_flag, clearsky], dtype=np.float64)

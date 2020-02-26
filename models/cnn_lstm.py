@@ -32,6 +32,16 @@ class cnn_lstm(Model):
         images = tf.reshape(
             images, [batch_size, -1, image_size, image_size, 3])
 
+        #         if images.shape[1] != 6:
+        #             return None
+        #             #if pretrained, must use the same preprocess as when the model was trained, here preprocess of resnet
+        #         # [batch, past_image, image_size, image_size, channel]
+        #         batch_size = images.shape[0]
+        #         image_size =  images.shape[2] #assume square images
+        #         images = tf.reshape(images, [-1, image_size, image_size, 5])
+        #         images = preprocess_input(images[:,:,:,0:3])
+        #         images = tf.reshape(images, [batch_size, -1, image_size, image_size, 3])
+
         return images
 
     def call(self, metas, images):

@@ -6,7 +6,6 @@ import typing
 import warnings
 import copy
 
-
 import cv2 as cv
 import h5py
 import lz4.frame
@@ -22,9 +21,11 @@ import pytz
 
 def get_label_color_mapping(idx):
     """Returns the PASCAL VOC color triplet for a given label index."""
+
     # https://gist.github.com/wllhf/a4533e0adebe57e3ed06d4b50c8419ae
     def bitget(byteval, ch):
         return (byteval & (1 << ch)) != 0
+
     r = g = b = 0
     for j in range(8):
         r = r | (bitget(idx, 0) << 7 - j)
@@ -187,10 +188,12 @@ def fetch_hdf5_sample(
         array = decompress_array(dataset[sample_idx], compr_type=compr_type, dtype=orig_dtype, shape=orig_shape)
     return array
 
+
 def print_attrs(name, obj):
-    print (name)
+    print(name)
     for key, val in obj.attrs.items():
-        print ("    %s: %s" % (key, val))
+        print("    %s: %s" % (key, val))
+
 
 def viz_hdf5_imagery(
         hdf5_path: str,
@@ -199,7 +202,6 @@ def viz_hdf5_imagery(
         stations: typing.Optional[typing.Dict[str, typing.Tuple]] = None,
         copy_last_if_missing: bool = True,
 ) -> None:
-
     """Displays a looping visualization of the imagery channels saved in an HDF5 file.
     This visualization requires OpenCV3+ ('cv2'), and will loop while refreshing a local window until the program
     is killed, or 'q' is pressed. The visualization can also be paused by pressing the space bar.
@@ -212,8 +214,9 @@ def viz_hdf5_imagery(
         # h5 data contains the start and end index to offset which image to get in the array
         global_start_idx = h5_data.attrs["global_dataframe_start_idx"]
         global_end_idx = h5_data.attrs["global_dataframe_end_idx"]
-        archive_lut_size = global_end_idx - global_start_idx# Number of images in the h5 file
-        global_start_time = datetime.datetime.strptime(h5_data.attrs["global_dataframe_start_time"], "%Y.%m.%d.%H%M") # The global start time is from 2011; first image date time
+        archive_lut_size = global_end_idx - global_start_idx  # Number of images in the h5 file
+        global_start_time = datetime.datetime.strptime(h5_data.attrs["global_dataframe_start_time"],
+                                                       "%Y.%m.%d.%H%M")  # The global start time is from 2011; first image date time
         lut_timestamps = [global_start_time + idx * datetime.timedelta(minutes=15) for idx in range(archive_lut_size)]
         # will only display GHI values if dataframe is available
         # Read and extract station position in images
@@ -244,7 +247,7 @@ def viz_hdf5_imagery(
                 "one of the saved channels had an expected dimension"
             last_valid_array_idx = None
             for array_idx, array in enumerate(channel_data):
-            # If missing, copy previous valid one.
+                # If missing, copy previous valid one.
                 if array is None:
                     if copy_last_if_missing and last_valid_array_idx is not None:
                         raw_data[array_idx, channel_idx, :, :] = raw_data[last_valid_array_idx, channel_idx, :, :]
@@ -490,11 +493,13 @@ def viz_predictions(
     day_count = int(math.ceil((end_bound - start_bound) / time_window))
     clearsky_ghi_data = np.full((day_count, len(stations), sample_count), fill_value=float("nan"), dtype=np.float32)
     station_ghi_data = np.full((day_count, len(stations), sample_count), fill_value=float("nan"), dtype=np.float32)
-    pred_ghi_data = np.full((day_count, len(stations), pred_horiz, sample_count), fill_value=float("nan"), dtype=np.float32)
+    pred_ghi_data = np.full((day_count, len(stations), pred_horiz, sample_count), fill_value=float("nan"),
+                            dtype=np.float32)
     days_range = pd.date_range(start_bound, end_bound, freq=time_window, closed="left")
     for day_idx, day_start in enumerate(tqdm.tqdm(days_range, desc="preparing daytime GHI intervals")):
         window_start, window_end = day_start - time_overlap, day_start + time_window + time_overlap
-        sample_start, sample_end = (window_start - start_bound) // time_sample, (window_end - start_bound) // time_sample
+        sample_start, sample_end = (window_start - start_bound) // time_sample, (
+                    window_end - start_bound) // time_sample
         for sample_iter_idx, sample_idx in enumerate(range(sample_start, sample_end + 1)):
             if sample_idx < 0 or sample_idx >= len(dataframe.index):
                 continue
@@ -578,7 +583,7 @@ def fetch_and_crop_hdf5_imagery(
             while (lats is None or lons is None) and idx < archive_lut_size:
                 lats, lons = fetch_hdf5_sample("lat", h5_data, idx), fetch_hdf5_sample("lon", h5_data, idx)
             assert lats is not None and lons is not None, "could not fetch lats/lons arrays (hdf5 might be empty)"
-            #for reg, coords in tqdm.tqdm(stations.items(), desc="preparing stations data"):
+            # for reg, coords in tqdm.tqdm(stations.items(), desc="preparing stations data"):
             for reg, coords in stations.items():
                 station_coords = (np.argmin(np.abs(lats - coords[0])), np.argmin(np.abs(lons - coords[1])))
                 station_data = {"coords": station_coords}
@@ -589,7 +594,8 @@ def fetch_and_crop_hdf5_imagery(
 
         if cropped_img_size:
             # different image for each station because cropped image around stations coordinate
-            raw_data = np.zeros((archive_lut_size, len(stations), len(channels), cropped_img_size, cropped_img_size), dtype=np.uint8)
+            raw_data = np.zeros((archive_lut_size, len(stations), len(channels), cropped_img_size, cropped_img_size),
+                                dtype=np.uint8)
         else:
             # nb of timeframe selected, nb of channel (5), height img, length img, each image has 3 channels (RGB)
             # raw_data = np.zeros((archive_lut_size, len(channels), 650, 1500, 3), dtype=np.uint8)
@@ -607,13 +613,14 @@ def fetch_and_crop_hdf5_imagery(
                     if copy_last_if_missing and last_valid_array_idx is not None:
                         if cropped_img_size:
                             for station_idx, (station_name, station) in enumerate(stations_data.items()):
-                                raw_data[array_idx, station_idx, channel_idx, :, :] = raw_data[last_valid_array_idx, station_idx, channel_idx, :, :]
+                                raw_data[array_idx, station_idx, channel_idx, :, :] = raw_data[last_valid_array_idx,
+                                                                                      station_idx, channel_idx, :, :]
                         else:
                             raw_data[array_idx, channel_idx, :, :] = raw_data[last_valid_array_idx, channel_idx, :, :]
                     continue
                 array = (((array.astype(np.float32) - norm_min) / (norm_max - norm_min)) * 255).astype(np.uint8)
                 # transform into RGB and add 3 channels per image
-                #array = cv.applyColorMap(array, cv.COLORMAP_BONE)
+                # array = cv.applyColorMap(array, cv.COLORMAP_BONE)
                 for station_idx, (station_name, station) in enumerate(stations_data.items()):
                     # station_color = utils.get_label_color_mapping(station_idx + 1).tolist()[::-1]
                     # shades = [(128,128,128), (255, 0, 0), (192,192,192), (112,128,144), (47,79,79), (220,220,220), (105,105,105)]
@@ -637,7 +644,7 @@ def fetch_and_crop_hdf5_imagery(
         display = np.stack(display_data)
         array_idx, window_name, paused = 0, hdf5_path.split("/")[-1], False
         while True:
-            cv.imshow(window_name, display[array_idx,:,:])
+            cv.imshow(window_name, display[array_idx, :, :])
             ret = cv.waitKey(30 if not paused else 300)
             if ret == ord('q') or ret == 27:  # q or ESC
                 break
@@ -646,8 +653,10 @@ def fetch_and_crop_hdf5_imagery(
             if not paused or ret == ord('c'):
                 array_idx = (array_idx + 1) % archive_lut_size
     if cropped_img_size:
-        raw_data = np.reshape(raw_data,(archive_lut_size * len(stations), len(channels), cropped_img_size, cropped_img_size))
+        raw_data = np.reshape(raw_data,
+                              (archive_lut_size * len(stations), len(channels), cropped_img_size, cropped_img_size))
     return raw_data
+
 
 def crop(array, center, cropped_img_size):
     """
@@ -657,8 +666,8 @@ def crop(array, center, cropped_img_size):
     :return: 2d numpy array corresponding to the cropped image
     """
 
-    crop_size = cropped_img_size - 1 # the center is excluded to compute the corners
-    #get coordinate of the corners of the resulting image if crop around the center given
+    crop_size = cropped_img_size - 1  # the center is excluded to compute the corners
+    # get coordinate of the corners of the resulting image if crop around the center given
     corner_coord = [center[0] - math.ceil(crop_size / 2), 1 + center[0] + math.floor(crop_size / 2),
                     center[1] - math.ceil(crop_size / 2), 1 + center[1] + math.floor(crop_size / 2)]
 
@@ -666,16 +675,17 @@ def crop(array, center, cropped_img_size):
     # 'center' will not be at the middle of the image if the crop was going outside of the image border.
     for i in reversed(range(len(corner_coord))):
         # move corners that are below 0 and shift the corresponding corner to keep the correct cropped size
-        corner_coord[i] -= min(0, corner_coord[(i//2)*2])
+        corner_coord[i] -= min(0, corner_coord[(i // 2) * 2])
     for i in range(len(corner_coord)):
         # move corners that are above the border and shift the corresponding corner to keep the correct cropped size
-        corner_coord[i] -= max(0, corner_coord[((i//2)*2)+1] - array.shape[i//2])
+        corner_coord[i] -= max(0, corner_coord[((i // 2) * 2) + 1] - array.shape[i // 2])
 
-    #assert (0 < array).any(), f"Cropping failed. Array {array.shape}, Crop size {crop_size}, Center {center}, Corners of tentatively cropped image {corner_coord}"
+    # assert (0 < array).any(), f"Cropping failed. Array {array.shape}, Crop size {crop_size}, Center {center}, Corners of tentatively cropped image {corner_coord}"
 
     return array[corner_coord[0]:corner_coord[1], corner_coord[2]:corner_coord[3]]
 
-def get_data(dataframe_path, start_date, end_date, channels = None, stations = None, cropped_img_size = 200):
+
+def get_data(dataframe_path, start_date, end_date, channels=None, stations=None, cropped_img_size=200):
     """
     :param dataframe_path:
     :param start_date: string corresponding to the date of the first day wanted e.g. "2011-12-01"
@@ -717,7 +727,7 @@ def get_data(dataframe_path, start_date, end_date, channels = None, stations = N
             "PSU": [40.72012, -77.93085, 376],
             "SXF": [43.73403, -96.62328, 473]
         }
-    start_date, end_date = start_date+" 08:00:00", end_date+" 08:00:00"
+    start_date, end_date = start_date + " 08:00:00", end_date + " 08:00:00"
 
     # select timeframe
     dataframe = pd.read_pickle(dataframe_path)
@@ -736,17 +746,19 @@ def get_data(dataframe_path, start_date, end_date, channels = None, stations = N
         i += 1
 
     hdf5_path = dataframe['hdf5_8bit_path'].iloc[dataframe.index.get_loc(wanted_days[0])]
-    imgs = fetch_and_crop_hdf5_imagery(hdf5_path, channels, stations, dataframe_path,cropped_img_size=cropped_img_size)
+    imgs = fetch_and_crop_hdf5_imagery(hdf5_path, channels, stations, dataframe_path, cropped_img_size=cropped_img_size)
     for day in wanted_days[1:]:
         hdf5_path = dataframe['hdf5_8bit_path'].iloc[dataframe.index.get_loc(day)]
-        day_img = fetch_and_crop_hdf5_imagery(hdf5_path, channels, stations, dataframe_path,cropped_img_size=cropped_img_size)
-        imgs = np.vstack((imgs,day_img))
+        day_img = fetch_and_crop_hdf5_imagery(hdf5_path, channels, stations, dataframe_path,
+                                              cropped_img_size=cropped_img_size)
+        imgs = np.vstack((imgs, day_img))
 
     ## format dataframe to correspond to imgs
 
     # keep those columns intact
-    dataframe = dataframe.set_index(['ncdf_path', 'hdf5_8bit_path', 'hdf5_8bit_offset', 'hdf5_16bit_path', 'hdf5_16bit_offset'],
-                      append=True)
+    dataframe = dataframe.set_index(
+        ['ncdf_path', 'hdf5_8bit_path', 'hdf5_8bit_offset', 'hdf5_16bit_path', 'hdf5_16bit_offset'],
+        append=True)
 
     # remove columns with about station not in the dictionary
     stations_name = tuple(stations.keys())
@@ -760,14 +772,15 @@ def get_data(dataframe_path, start_date, end_date, channels = None, stations = N
 
     # add column station index and add it as index (with the datetime)
     dataframe['STATION_INDEX'] = dataframe.apply(lambda row: stations_name.index(row['STATION_NAME']), axis=1)
-    dataframe = dataframe.set_index(['STATION_INDEX'],append=True)
+    dataframe = dataframe.set_index(['STATION_INDEX'], append=True)
 
     # sort dataframe so that the index correspond between the dataframe and the images np.array
 
-    dataframe.sort_index( inplace=True)
+    dataframe.sort_index(inplace=True)
     return dataframe, imgs
 
-def get_sample(processed_dataframe, cropped_imgs, iso_datetime, station_idx = None):
+
+def get_sample(processed_dataframe, cropped_imgs, iso_datetime, station_idx=None):
     """
     :param processed_dataframe: dataframe processed by get_data
     :param cropped_imgs: cropped imgs from get_data
@@ -788,107 +801,111 @@ def get_sample(processed_dataframe, cropped_imgs, iso_datetime, station_idx = No
         n = df.index.get_loc((iso_datetime))
     return processed_dataframe.iloc[n], cropped_imgs[n]
 
-def image_data_generator(data, batch_size=32):
 
+def image_data_generator(data, batch_size=32):
     for idx, (imgs, stations_data) in enumerate(data):
-        imgs = imgs.reshape(-1, 64,64,5)
+        imgs = imgs.reshape(-1, 64, 64, 5)
         target_list = []
         for station_name, station_reading in stations_data.items():
             ghi_reading = station_reading['ghi'] + batch_size * [0]
-            for idx in range(0, len(ghi_reading)-batch_size):
-                target_list.append(ghi_reading[idx:idx+4])
+            for idx in range(0, len(ghi_reading) - batch_size):
+                target_list.append(ghi_reading[idx:idx + 4])
         target_list = np.vstack(target_list)
 
         for img_idx in range(0, imgs.shape[0], batch_size):
-            yield imgs[img_idx:img_idx+batch_size].astype(np.float32), target_list[img_idx:img_idx+batch_size].astype(np.float32)
+            yield imgs[img_idx:img_idx + batch_size].astype(np.float32), target_list[
+                                                                         img_idx:img_idx + batch_size].astype(
+                np.float32)
+
 
 def dummy_data_generator(data, batch_size=32):
-        """
-        Generate dummy data for the model, only for example purposes.
-        """
-        batch_size = 32
-        image_dim = (64, 64)
-        n_channels = 5
-        output_seq_len = 4
+    """
+    Generate dummy data for the model, only for example purposes.
+    """
+    batch_size = 32
+    image_dim = (64, 64)
+    n_channels = 5
+    output_seq_len = 4
 
-        for i in range(0, len(target_datetimes), batch_size):
-            batch_of_datetimes = target_datetimes[i:i+batch_size]
-            # This is evaluator, so there is timestamp for test time.
-            # Which training, do we need to specify the datetimes? or we can get all data?
+    for i in range(0, len(target_datetimes), batch_size):
+        batch_of_datetimes = target_datetimes[i:i + batch_size]
+        # This is evaluator, so there is timestamp for test time.
+        # Which training, do we need to specify the datetimes? or we can get all data?
 
-            samples = tf.random.uniform(shape=(
-                len(batch_of_datetimes), image_dim[0], image_dim[1], n_channels
-            ))
-            targets = tf.zeros(shape=(
-                len(batch_of_datetimes), output_seq_len
-            ))
-            # Remember that you do not have access to the targets.
-            # Your dataloader should handle this accordingly.
-            yield samples, targets
+        samples = tf.random.uniform(shape=(
+            len(batch_of_datetimes), image_dim[0], image_dim[1], n_channels
+        ))
+        targets = tf.zeros(shape=(
+            len(batch_of_datetimes), output_seq_len
+        ))
+        # Remember that you do not have access to the targets.
+        # Your dataloader should handle this accordingly.
+        yield samples, targets
 
-def process_df(df,big_gap=6):
+
+def process_df(df, big_gap=6):
     """
     Big gap is calculated in number of hours but
     code can easily be changed for days or weeks if necessary
     Definition of classes still need to be done
-    Will need some modifications when the ratio is divided by 0 
+    Will need some modifications when the ratio is divided by 0
     or need to deal with this in class allocation
     """
     # Add ratio and flag that GHI exist
-    station = ['BND','TBL','DRA','FPK','GWN','PSU','SXF']
+    station = ['BND', 'TBL', 'DRA', 'FPK', 'GWN', 'PSU', 'SXF']
     for stat in station:
-        df[f"Flag_T0_{stat}"]= 1 - df[f"{stat}_GHI"].isnull()
-        df[f"Ratio_GHI_{stat}"] = df[f"{stat}_CLEARSKY_GHI"]/df[f"{stat}_GHI"]
-    
+        df[f"Flag_T0_{stat}"] = 1 - df[f"{stat}_GHI"].isnull()
+        df[f"Ratio_GHI_{stat}"] = df[f"{stat}_CLEARSKY_GHI"] / df[f"{stat}_GHI"]
+
     # Add flag that the image at T0 exists
-    df['Flag_T0_image']= df['ncdf_path']!='nan'
-    
+    df['Flag_T0_image'] = df['ncdf_path'] != 'nan'
+
     # Add counts of consecutive missing image paths
-    df['count_no_path'] = df.groupby((df['ncdf_path'] != df['ncdf_path'].shift(1)).cumsum()).cumcount()+1
-    
+    df['count_no_path'] = df.groupby((df['ncdf_path'] != df['ncdf_path'].shift(1)).cumsum()).cumcount() + 1
+
     # Remove large gaps in dataframe
     adjust = datetime.timedelta(minutes=-15)
-    gap_num = big_gap*4
-    gap_time = datetime.timedelta(hours=-(big_gap-.25))
-    pos_big_gap=df[df['count_no_path']==gap_num].index
+    gap_num = big_gap * 4
+    gap_time = datetime.timedelta(hours=-(big_gap - .25))
+    pos_big_gap = df[df['count_no_path'] == gap_num].index
     for pos in pos_big_gap:
         count = df['count_no_path'][pos:]
-        end=count[count == 1].index[0]+adjust
-        start = pos+gap_time
-        to_drop = pd.date_range(start,end,freq='15min')
-        df=df[~df.index.isin(to_drop)]
-    
+        end = count[count == 1].index[0] + adjust
+        start = pos + gap_time
+        to_drop = pd.date_range(start, end, freq='15min')
+        df = df[~df.index.isin(to_drop)]
+
     # Create flag for data availability
-    target = [0,1,3,6]
-    
+    target = [0, 1, 3, 6]
+
     for stat in station:
-        df[f"{stat}_data_avail"]=0
+        df[f"{stat}_data_avail"] = 0
         for goal in target:
             goaltime = datetime.timedelta(hours=goal)
-            df[f"{stat}_data_avail"] += df[f"{stat}_GHI"][df[f"{stat}_GHI"].index+goaltime].isnull()
-        df[f"{stat}_data_avail"] = df[f"{stat}_data_avail"]==0
-        df[f"{stat}_data_avail_day"] = df[f"{stat}_data_avail"]*df[f"{stat}_DAYTIME"]
-    return df    
-            
+            df[f"{stat}_data_avail"] += df[f"{stat}_GHI"][df[f"{stat}_GHI"].index + goaltime].isnull()
+        df[f"{stat}_data_avail"] = df[f"{stat}_data_avail"] == 0
+        df[f"{stat}_data_avail_day"] = df[f"{stat}_data_avail"] * df[f"{stat}_DAYTIME"]
+    return df
+
 
 def get_station_timezone(stations):
     station_timezone = {}
     for station_name in stations.keys():
         tf = TimezoneFinder()
-    #     latitude, longitude = 52.5061, 13.358
+        #     latitude, longitude = 52.5061, 13.358
         latitude, longitude = stations[station_name][0], stations[station_name][1]
         timezone = tf.timezone_at(lng=longitude, lat=latitude)
         station_timezone[station_name] = pytz.timezone(timezone)
     return station_timezone
-            
 
 def convert_time(timestamp, station_timezone, station_name):
     """
-    Take the hour/minute and month of the timestamp and convert them to a 
+    Take the hour/minute and month of the timestamp and convert them to a
     sin/cos vector to better represent the similarity between January (1)
     and December (12) or 23h45 and 00h00
     This function can take a string (json file) or a timestamp object (pd dataframe)
     """
+
     fmt = "%Y-%m-%d %H:%M:%S"
 
     try:
@@ -899,15 +916,16 @@ def convert_time(timestamp, station_timezone, station_name):
 
     tz = station_timezone[station_name]
     local_datetime = utc_time.astimezone(tz)
-    
-    min15_in_day = 24*4
-    sin_month = np.sin(2*np.pi*local_datetime.month/12)
-    cos_month = np.cos(2*np.pi*local_datetime.month/12)
-    sin_minute = np.sin(2*np.pi*(local_datetime.hour*4 +
-                                 local_datetime.minute/15)/min15_in_day)
-    cos_minute = np.cos(2*np.pi*(local_datetime.hour *
-                                 4+local_datetime.minute/15)/min15_in_day)
-    return (sin_month,cos_month,sin_minute,cos_minute)
+
+    min15_in_day = 24 * 4
+    sin_month = np.sin(2 * np.pi * local_datetime.month / 12)
+    cos_month = np.cos(2 * np.pi * local_datetime.month / 12)
+    sin_minute = np.sin(2 * np.pi * (local_datetime.hour * 4 +
+                                     local_datetime.minute / 15) / min15_in_day)
+    cos_minute = np.cos(2 * np.pi * (local_datetime.hour *
+                                     4 + local_datetime.minute / 15) / min15_in_day)
+    return (sin_month, cos_month, sin_minute, cos_minute)
+
 
 if __name__ == "__main__":
     # Show cropped images for a day
@@ -917,10 +935,10 @@ if __name__ == "__main__":
     df, imgs = get_data(
         "/project/cq-training-1/project1/data/catalog.helios.public.20100101-20160101.pkl", "2011-12-01", "2011-12-04")
 
-    print('Dataframe', df.shape, 'Images',imgs.shape)
+    print('Dataframe', df.shape, 'Images', imgs.shape)
 
     a_datetime = datetime.datetime.fromisoformat("2011-12-03 13:45:00")
     metadata, cropped_image = get_sample(df, imgs, a_datetime, 4)
-    print('Specific metadata', metadata.shape,'Specific image', cropped_image.shape)
+    print('Specific metadata', metadata.shape, 'Specific image', cropped_image.shape)
     print(metadata)
     print(cropped_image)
