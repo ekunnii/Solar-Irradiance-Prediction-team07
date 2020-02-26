@@ -59,7 +59,7 @@ def evaluation_dataset(
                     sin_month, cos_month, sin_minute, cos_minute = utils.convert_time(row.name, station_timezones, station_idx)  # encoding months and hour/minutes
 
                     daytime_flag, clearsky, _, __ = row.loc[row.index.str.startswith(station_idx)]
-                    if clearsky.isnull():
+                    if np.isnan(clearsky):
                         clearsky = 200 # close to average value
 
                     meta_array = np.array([sin_month,cos_month,sin_minute,cos_minute,
@@ -77,7 +77,7 @@ def evaluation_dataset(
 
             if debug:
                 print(f"Not yielding any results! or done... {hdf5_path}")
-            return
+            
 
     # End of _eval_dataset function
     return tf.data.Dataset.from_generator(_eval_dataset, output_types=(tf.float64, tf.float64, tf.float64,))
