@@ -127,7 +127,11 @@ def train_step(model, optimizer, meta_data, images, labels):
     # of the loss with respect to the variables can be computed.
     with tf.GradientTape() as tape:
         y_pred = model(meta_data, images, training=True)
-        loss = compute_loss(labels, y_pred)   
+        loss = compute_loss(labels, y_pred)
+
+    # print(model.summary())
+    # import sys
+    # sys.exit()
     grads = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
@@ -281,7 +285,7 @@ if __name__ == "__main__":
 
     train_ds, valid_ds = solar_datasets()
 
-    optimizer = tf.keras.optimizers.Adam(learning_rate=0.00005) #0.00003
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001) #0.00003
     compute_loss = tf.keras.losses.MSE
 
     # Where to save checkpoints, tensorboard summaries, etc.

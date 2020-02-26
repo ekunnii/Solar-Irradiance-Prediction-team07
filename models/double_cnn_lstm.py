@@ -16,21 +16,24 @@ class double_cnn_lstm(Model):
         # self.resnet50_2 = TimeDistributed(ResNet50(include_top=False, weights='imagenet', input_shape=(64, 64, 3)))
 
         self.resnet50_1 = ResNet50(include_top=False, weights='imagenet', input_shape=(64, 64, 3))
-        for layer in self.resnet50_1.layers[:103]:  # freeze 60%
-            layer.trainable = False
+        # for layer in self.resnet50_1.layers[:103]:  # freeze 60%
+        #     layer.trainable = False
         self.resnet50_1 = TimeDistributed(self.resnet50_1)
 
         self.resnet50_2 = ResNet50(include_top=False, weights='imagenet', input_shape=(64, 64, 3))
-        for layer in self.resnet50_2.layers[:103]:  # freeze 60%
-            layer.trainable = False
+        # for layer in self.resnet50_2.layers[:103]:  # freeze 60%
+        #     layer.trainable = False
         self.resnet50_2 = TimeDistributed(self.resnet50_2)
 
         self.avg_pool = TimeDistributed(GlobalAveragePooling2D())
 
-        #self.d1 = TimeDistributed(Dense(500, activation='relu'))  # nb of channels at the end of a resnet  * 2 + len(metas)
-        self.d2 = Dense(len(target_time_offsets), activation="relu")
-        self.lstm1 = LSTM(units=64)
-        self.lstm2 = LSTM(units=64)
+        self.d1_1 = TimeDistributed(Dense(256, activation='relu'))
+        self.d1_2 = TimeDistributed(Dense(256, activation='relu'))
+        self.lstm1 = LSTM(units=128)
+        self.lstm2 = LSTM(units=128)
+        self.d2_1 = Dense(32, activation='relu')
+        self.d2_2 = Dense(32, activation='relu')
+        self.d3 = Dense(len(target_time_offsets), activation="relu")
 
     def input_transform(self, images):
         # if images.shape[1] != 6:
@@ -65,21 +68,21 @@ class double_cnn_lstm(Model):
 
         metas = tf.dtypes.cast(metas, np.float32)
 
+        # CNN part
         x_1 = self.resnet50_1(images_1)
         x_1 = self.avg_pool(x_1) #(batch size, past images, nb channels)
+        x_1 = self.d1_1(x_1)
 
         x_2 = self.resnet50_2(images_2)
         x_2 = self.avg_pool(x_2)
+        x_2 = self.d1_2(x_2)
 
-        # x = tf.concat([x_1,x_2], -1 ) #(batch size, past images, 2048*2)
-        #
-        # x = self.d1(x) #(batch_size, past images, 500)
-        # x = self.lstm1(x)
-        # x = tf.concat([x, metas], 1)
-        # x = self.d2(x)
-        # return x
-
+        # LSTM part
         x_1 = self.lstm1(x_1)
+        x_1 = self.d2_1(x_1)
+
         x_2 = self.lstm2(x_2)
+        x_2 = self.d2_2(x_2)
+
         x = tf.concat([x_1, x_2, metas], 1)
-        return self.d2(x)
+        return self.d3(x)
