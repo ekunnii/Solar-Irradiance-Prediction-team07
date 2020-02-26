@@ -12,7 +12,7 @@ class resnet(Model):
         else:
             self.resnet50 = ResNet50(include_top=False, weights=None, input_shape=(64, 64, 5))
         self.avg_pool = GlobalAveragePooling2D()
-        self.d1 = Dense(2048+2, activation='relu') #nb of channels at the end of resnet + len(metas)
+        self.d1 = Dense(1000, activation='relu') #nb of channels at the end of resnet + len(metas)
         self.d2 = Dense(len(target_time_offsets), activation="relu")
 
 

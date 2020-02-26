@@ -4,6 +4,7 @@ from tensorflow.keras.applications.resnet50 import ResNet50
 from tensorflow.keras.layers import Dense, Flatten, GlobalAveragePooling2D
 from tensorflow.keras import Model
 from tensorflow.keras.applications.resnet50 import preprocess_input  as preprocess_input_resnet50
+import os
 
 class double_resnet(Model):
     def __init__(self, target_time_offsets):
@@ -12,8 +13,8 @@ class double_resnet(Model):
         self.resnet50_2 = ResNet50(include_top=False, weights='imagenet', input_shape=(64, 64, 3))
 
         self.avg_pool = GlobalAveragePooling2D()
-        self.d1 = Dense(2048*2+2, activation='relu') #nb of channels at the end of a resnet  * 2 + len(metas)
-        self.d2 = Dense(2048+2, activation='relu')
+        self.d1 = Dense(2048, activation='relu') #nb of channels at the end of a resnet  * 2 + len(metas)
+        self.d2 = Dense(1000, activation='relu')
         self.d3 = Dense(len(target_time_offsets), activation="relu")
 
     def call(self, metas, images):
@@ -33,3 +34,13 @@ class double_resnet(Model):
         x = self.d1(x)
         x = self.d2(x)
         return self.d3(x)
+
+    def load_config(self, model, user_config):
+        double_pretrained_resnet_config = user_config.get("double_pretrained_resnet")
+        model_path = double_pretrained_resnet_config.get("model_path")
+        assert os.path.exists(model_path), f"Can't find model path: {model_path}"
+
+        optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
+        checkpoint = tf.train.Checkpoint(model=model, optimizer=optimizer)
+        checkpoint.restore(tf.train.latest_checkpoint(model_path))
+        return model
