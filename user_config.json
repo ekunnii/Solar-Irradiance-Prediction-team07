@@ -1,17 +1,20 @@
 {
     "image_dim": 64,
     "debug": false,
-    "with_pass_values": [
-        "P0DT0H30M0S",
-        "P0DT1H0M0S",
-        "P0DT1H30M0S"
-    ],
+
     "df_image_column": "hdf5_8bit_path",
 
     "random_subset_of_days": "20%",
 
-    "model_name": "CNN3D", 
+    "with_pass_values": [
+    ],
+
     "cnn3d": {
-        "model_path": "/project/cq-training-1/project1/teams/team07/goodmodels/cnn3d"
+        "model_path": "C:/Users/Game/AI/ProjectClass/Solar-Irradiance-Prediction-team07/models/cnn3d good model"
+    },
+
+    "model_name": "double_pretrained_resnet",
+    "double_pretrained_resnet": {
+        "model_path": "/project/cq-training-1/project1/teams/team07/goodmodels/double_pretrained_resnet"
     }
 }
