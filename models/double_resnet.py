@@ -47,5 +47,5 @@ class double_resnet(Model):
 
         optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
         checkpoint = tf.train.Checkpoint(model=model, optimizer=optimizer)
-        checkpoint.restore(tf.train.latest_checkpoint(model_path))
+        checkpoint.restore(tf.train.latest_checkpoint(model_path)).expect_partial()
         return model
