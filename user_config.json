@@ -7,6 +7,9 @@
     "random_subset_of_days": "20%",
 
     "with_pass_values": [
+        "P0DT1H0M0S",
+        "P0DT2H0M0S",
+        "P0DT3H0M0S"
     ],
 
     "cnn3d": {
