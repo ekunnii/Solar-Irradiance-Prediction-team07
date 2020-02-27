@@ -21,8 +21,8 @@ class cnn_lstm(Model):
         batch_size = images.shape[0]
         image_size =  images.shape[2] #assume square images
         images = tf.reshape(images, [-1, image_size, image_size, 5])
-        images_ = tf.convert_to_tensor(images.numpy()[:,:,:,[0,2,4]])
-        images = preprocess_input_resnet50(images[:,:,:,0:3])
+        images = tf.convert_to_tensor(images.numpy()[:,:,:,[0,2,4]])
+        images = preprocess_input_resnet50(images)
         images = tf.reshape(images, [batch_size, -1, image_size, image_size, 3])
 
         return images
