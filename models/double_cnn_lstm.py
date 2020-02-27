@@ -27,12 +27,12 @@ class double_cnn_lstm(Model):
 
         self.avg_pool = TimeDistributed(GlobalAveragePooling2D())
 
-        self.d1_1 = TimeDistributed(Dense(128, activation='relu'))
-        self.d1_2 = TimeDistributed(Dense(128, activation='relu'))
-        self.lstm1 = LSTM(units=64)
-        self.lstm2 = LSTM(units=64)
-        self.d2_1 = Dense(16, activation='relu')
-        self.d2_2 = Dense(16, activation='relu')
+        self.d1_1 = TimeDistributed(Dense(256, activation='relu'))
+        self.d1_2 = TimeDistributed(Dense(256, activation='relu'))
+        self.lstm1 = LSTM(units=128)
+        self.lstm2 = LSTM(units=128)
+        self.d2_1 = Dense(32, activation='relu')
+        self.d2_2 = Dense(32, activation='relu')
         self.d3 = Dense(len(target_time_offsets), activation="relu")
 
     def input_transform(self, images):
