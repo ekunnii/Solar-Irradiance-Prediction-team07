@@ -33,13 +33,6 @@ echo "Calling python train script."
 #stdbuf -oL python -u ./train.py $PWD/train_config.json $PWD/train_config.json -n 10 -m "cnn_lstm" --scratch_dir $SCRATCH --delete_checkpoints --use_cache -s 1234 --user_config user_config.json --save_best
 
 #stdbuf -oL python -u ./train.py $PWD"/train_config.json" -n 200 -m "double_pretrained_resnet" --run_setting "double pretrained resnet50, crop 64, nofreeze" --scratch_dir $SCRATCH --load_checkpoints
-#stdbuf -oL python -u ./train.py $PWD"/train_config.json" -n 200 -m "cnn_lstm" --run_setting "cnn_lstm_100_epochs_test"  -s 1234 --user_config user_config.json --save_best --use_cache
+stdbuf -oL python -u ./train.py $PWD"/train_config.json" -n 50 -m "cnn_lstm" --scratch_dir $SCRATCH --run_setting "last minute cnn-lstm" --user_config user_config.json --save_best --use_cache --delete_checkpoints
 #stdbuf -oL python -u ./train.py $PWD"/train_config.json" -n 30 -m "pretrained_resnet" --run_setting "pretrained resnet50, crop 64, nofreeze" --scratch_dir $SCRATCH --use_cache --load_checkpoints --save_best
 # stdbuf -oL python -u ./train.py $PWD"/train_config.json" -n 50 -m "double_cnn_lstm" --run_setting "double cnn double! lstm, full meta, crop 64, lstm(128), T0-1h T0-2h, freeze 50%" --scratch_dir $SCRATCH --use_cache --user_config user_config.json --save_best
-stdbuf -oL python -u ./train.py $PWD"/train_config.json" \
--n 50 -m "cnn_seq2seq" \
---run_setting "cnn_seq2seq-gru(256), partial meta, crop 64, output dropout(0.5) T0-30m T0-1h, T0-1h30m" \
---scratch_dir $SCRATCH \
---user_config user_config.json \
---save_best \
---use_cache
