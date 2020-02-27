@@ -18,11 +18,16 @@ class double_resnet(Model):
         self.d3 = Dense(len(target_time_offsets), activation="relu")
 
     def call(self, metas, images):
+        images_ = tf.dtypes.cast(images, np.float32)
+        metas_ = tf.dtypes.cast(metas, np.float32)
 
-        images_1 = tf.convert_to_tensor(images.numpy()[:,:,:,[0,2,4]])
-        images_2 = tf.convert_to_tensor(images.numpy()[:,:,:,[1,2,3]])
+        images_1 = tf.convert_to_tensor(images_.numpy()[:,:,:,[0,2,4]])
+        images_2 = tf.convert_to_tensor(images_.numpy()[:,:,:,[1,2,3]])
+
         images_1 = preprocess_input_resnet50(images_1)
         images_2 = preprocess_input_resnet50(images_2)
+
+        metas_ = tf.convert_to_tensor(metas_.numpy()[:, [0,1,2,3,4,5,6,8]])
 
         x_1 = self.resnet50_1(images_1)
         x_1 = self.avg_pool(x_1)
@@ -30,7 +35,7 @@ class double_resnet(Model):
         x_2 = self.resnet50_2(images_2)
         x_2 = self.avg_pool(x_2)
 
-        x = tf.concat([x_1, x_2, metas], 1)
+        x = tf.concat([x_1, x_2, metas_], 1)
         x = self.d1(x)
         x = self.d2(x)
         return self.d3(x)
