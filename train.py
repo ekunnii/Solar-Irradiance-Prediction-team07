@@ -129,16 +129,8 @@ def train_step(model, optimizer, meta_data, images, labels):
         y_pred = model(meta_data, images, training=True)
         loss = compute_loss(labels, y_pred)
 
-    # print(model.summary())
-    # import sys
-    # sys.exit()
     grads = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
-
-    if tf.equal(optimizer.iterations % 100, 0):
-        # print('***pred', np.mean(y_pred, axis=0), 'label:', np.mean(labels, axis=0), 'nb prediction 0:', np.sum(y_pred <= 1))
-        print("***predictions: ", y_pred[10].numpy(), "labels", labels[10].numpy())
-
     return loss
 
 # train steps for seq2seq
