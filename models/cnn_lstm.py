@@ -14,7 +14,7 @@ class cnn_lstm(Model):
         self.d2 = Dense(len(target_time_offsets), activation="relu")
         self.lstm1 = LSTM(units=32)
 
-    def input_transform(images):
+    def input_transform(self, images):
 
         #if pretrained, must use the same preprocess as when the model was trained, here preprocess of resnet
         # [batch, past_image, image_size, image_size, channel]
