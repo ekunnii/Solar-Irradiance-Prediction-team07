@@ -30,8 +30,8 @@ def evaluation_dataset(
 
     def _eval_dataset():
 
-        targets = dataframe[dataframe.index.isin(target_datetimes)]
-        assert targets.shape[0] == len(target_datetimes), "Could not find all specified targets dates in dataframe. Missing targets!"
+        targets = pd.DataFrame([dataframe.loc[target] for target in target_datetimes])
+        assert len(targets) == len(target_datetimes), "Could not find all specified targets dates in dataframe. Missing targets!"
         for row_date, row in targets.iterrows():
             image_path = row.loc['hdf5_8bit_path']
             # assert image_path.contains('nan|NAN|NaN'), "Target image has no image path!"
