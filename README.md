@@ -7,39 +7,11 @@ Team memeber:
 - Ruel, Marc-André
 - Daigle, Maxime
 
-## Installation
-We assume that you have python3.7 on Linux or windows
+# Submission execution
+We don't have a requirement.txt in our project since everyone was working on different environments (conda windows, pip on mac and cluster does not have access to internet.) All the required python packages are installed on the cluster prior to execution in "evaluation_script.sh"
 
-On linux, you can use virtualenv to manage virtual env
+To run the evaluation: 
+* Modify the "evaluation_script.sh to point to your own admin_config.json
+* run on cluster with: sbatch evaluation_script.sh
 
-```
-ProjectPath=/path/to/project/repo
-virtualenv --python=python3.7 --no-download ${ProjectPath}/solar_env
-source ${ProjectPath}/solar_env/bin/activate
-pip3 install -r requirements.txt
-```
 
-On Windows, you can use anaconda to manage virtual env
-
-```
-conda create --name solar_env
-conda activate solar_env
-pip install -r requirements.txt
-```
-
-## Execution
-
-Please activate the env next time
-
-Linux:
-
-```
-ProjectPath=/path/to/project/repo
-source ${ProjectPath}/solar_env/bin/activate
-```
-
-Windows:
-
-```
-conda activate solar_env
-```
