@@ -15,7 +15,7 @@ class cnn_lstm(Model):
         self.d1_1 = TimeDistributed(Dense(512, activation='relu'))
         self.d2 = Dense(32, activation='relu')
         self.d3 = Dense(len(target_time_offsets), activation="relu")
-        self.lstm1 = LSTM(units=64)
+        self.lstm1 = LSTM(units=128)
 
     def input_transform(self, images):
 
