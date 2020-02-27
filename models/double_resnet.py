@@ -16,7 +16,7 @@ class double_resnet(Model):
         self.d1 = Dense(2048, activation='relu') #nb of channels at the end of a resnet  * 2 + len(metas)
         self.d2 = Dense(1000, activation='relu')
         self.d3 = Dense(len(target_time_offsets), activation="relu")
-
+        
     def call(self, metas, images):
         images_ = tf.dtypes.cast(images, np.float32)
         metas_ = tf.dtypes.cast(metas, np.float32)

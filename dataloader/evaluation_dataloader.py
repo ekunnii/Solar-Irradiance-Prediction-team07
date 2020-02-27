@@ -25,11 +25,13 @@ def evaluation_dataset(
     image_dim = user_config and user_config.get("image_dim") or 64
     channels = user_config and user_config.get("target_channels") or ["ch1", "ch2", "ch3", "ch4", "ch6"]
     with_pass_values = user_config and user_config.get("with_pass_values") or []
+    # get localtimezone
+    station_timezones = utils.get_station_timezone(stations)
 
     def _eval_dataset():
 
-        targets = dataframe[dataframe.index.isin(target_datetimes)]
-        assert targets.shape[0] == len(target_datetimes), "Could not find all specified targets dates in dataframe. Missing targets!"
+        targets = pd.DataFrame([dataframe.loc[target] for target in target_datetimes])
+        assert len(targets) == len(target_datetimes), "Could not find all specified targets dates in dataframe. Missing targets!"
         for row_date, row in targets.iterrows():
             image_path = row.loc['hdf5_8bit_path']
             # assert image_path.contains('nan|NAN|NaN'), "Target image has no image path!"
@@ -52,14 +54,16 @@ def evaluation_dataset(
 
                     # get meta info
                     lat, lont, alt = stations[station_idx] #lat, lont, alt
-                    # Warning, encoding of hours/minutes doesn't take into account the actual time according
-                    # to the different timezone of the different stations?
-                    sin_month,cos_month,sin_minute,cos_minute = utils.convert_time(row.name) #encoding months and hour/minutes
+                    # Encoding of hours/minutes take into account the local time according
+                        # to the different timezone of the different stations
+                    sin_month, cos_month, sin_minute, cos_minute = utils.convert_time(row.name, station_timezones, station_idx)  # encoding months and hour/minutes
+
                     daytime_flag, clearsky, _, __ = row.loc[row.index.str.startswith(station_idx)]
+                    if np.isnan(clearsky):
+                        clearsky = 200 # close to average value
 
                     meta_array = np.array([sin_month,cos_month,sin_minute,cos_minute,
                                             lat, lont, alt, daytime_flag, clearsky], dtype=np.float64)
-
                     # Get image data
                     image_data = du.get_image_transformed(
                         h5_data, h5_data_previous_day, channels, station_pixel_coords, 
@@ -73,7 +77,7 @@ def evaluation_dataset(
 
             if debug:
                 print(f"Not yielding any results! or done... {hdf5_path}")
-            return
+            
 
     # End of _eval_dataset function
     return tf.data.Dataset.from_generator(_eval_dataset, output_types=(tf.float64, tf.float64, tf.float64,))

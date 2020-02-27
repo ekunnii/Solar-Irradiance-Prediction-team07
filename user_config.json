@@ -7,12 +7,8 @@
     "random_subset_of_days": "20%",
 
     "with_pass_values": [
-        "P0DT1H00M0S",
-        "P0DT3H0M0S",
-        "P0DT6H00M0S"
     ],
 
-    "model_name": "CNN3D", 
     "cnn3d": {
         "model_path": "C:/Users/Game/AI/ProjectClass/Solar-Irradiance-Prediction-team07/models/cnn3d good model"
     },

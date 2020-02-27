@@ -19,7 +19,6 @@ from timezonefinder import TimezoneFinder
 import datetime
 import pytz
 
-
 def get_label_color_mapping(idx):
     """Returns the PASCAL VOC color triplet for a given label index."""
 
@@ -899,7 +898,6 @@ def get_station_timezone(stations):
         station_timezone[station_name] = pytz.timezone(timezone)
     return station_timezone
 
-
 def convert_time(timestamp, station_timezone, station_name):
     """
     Take the hour/minute and month of the timestamp and convert them to a
@@ -907,6 +905,7 @@ def convert_time(timestamp, station_timezone, station_name):
     and December (12) or 23h45 and 00h00
     This function can take a string (json file) or a timestamp object (pd dataframe)
     """
+
     fmt = "%Y-%m-%d %H:%M:%S"
 
     try:

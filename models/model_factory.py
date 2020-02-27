@@ -10,6 +10,7 @@ from models.cnn3d import cnn3d
 from models.cnn3d_v2 import cnn3d_v2
 from models.cnn_lstm import cnn_lstm
 from models.double_cnn_lstm import double_cnn_lstm
+from models.cnn_seq2seq import cnn_seq2seq
 import tensorflow as tf
 
 
@@ -45,6 +46,7 @@ class ModelFactory():
             'resnet': resnet,
             'double_pretrained_resnet': double_resnet,
             'CNN3D': cnn3d,
+            'cnn_seq2seq': cnn_seq2seq,
             'CNN3D_V2': cnn3d_v2,
         }
 
