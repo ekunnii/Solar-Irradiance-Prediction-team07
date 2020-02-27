@@ -105,14 +105,15 @@ def preprocess(images, meta_data):
 
     elif 'double_pretrained_resnet' == args.model_name or 'resnet' == args.model_name or 'double_cnn_lstm' == args.model_name:
 
-        images = tf.dtypes.cast(images, np.float32)
-        meta_data = tf.dtypes.cast(meta_data, np.float32)
-
-        # meta_data is of shape (nb sample, 9) where the 9 features are:
-        # [sin_month,cos_month,sin_minute,cos_minute, lat, lont, alt, daytime_flag, clearsky]
-        # trying with minimalistic meta where only use daytime_flag and clearsky
-        # meta_data = tf.convert_to_tensor(meta_data.numpy()[:, [0,1,4,5,6,7,8]])
-        meta_data = meta_data[:, -2:]
+        return images, meta_data
+        # images = tf.dtypes.cast(images, np.float32)
+        # meta_data = tf.dtypes.cast(meta_data, np.float32)
+        #
+        # # meta_data is of shape (nb sample, 9) where the 9 features are:
+        # # [sin_month,cos_month,sin_minute,cos_minute, lat, lont, alt, daytime_flag, clearsky]
+        # # trying with minimalistic meta where only use daytime_flag and clearsky
+        # # meta_data = tf.convert_to_tensor(meta_data.numpy()[:, [0,1,4,5,6,7,8]])
+        # meta_data = meta_data[:, -2:]
 
 
     else:
@@ -301,7 +302,7 @@ if __name__ == "__main__":
 
     train_ds, valid_ds = solar_datasets()
 
-    optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001) #0.00003
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.00005) #0.00003
     compute_loss = tf.keras.losses.MSE
 
     # Where to save checkpoints, tensorboard summaries, etc.
