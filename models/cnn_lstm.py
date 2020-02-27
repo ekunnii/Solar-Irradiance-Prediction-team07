@@ -1,18 +1,21 @@
 import tensorflow as tf
 import numpy as np
 from tensorflow.keras.applications.resnet50 import ResNet50
-from tensorflow.keras.layers import Dense, Flatten, GlobalAveragePooling2D, LSTM, TimeDistributed, ConvLSTM2D, BatchNormalization
+from tensorflow.keras.layers import Dense, Flatten, GlobalAveragePooling2D, LSTM, ConvLSTM2D, BatchNormalization
 from tensorflow.keras import Model
 from tensorflow.keras.applications.resnet50 import preprocess_input as preprocess_input_resnet50
+from utils.wrapper import TimeDistributed
 
 class cnn_lstm(Model):
     def __init__(self, target_time_offsets):
         super(cnn_lstm, self).__init__()
         self.resnet50 = TimeDistributed(ResNet50(include_top=False, weights='imagenet', input_shape=(64, 64, 3)))
         self.avg_pool = TimeDistributed(GlobalAveragePooling2D())
-        self.d1 = TimeDistributed(Dense(512, activation='relu'))
-        self.d2 = Dense(len(target_time_offsets), activation="relu")
-        self.lstm1 = LSTM(units=32)
+        self.d1 = TimeDistributed(Dense(1024, activation='relu'))
+        self.d1_1 = TimeDistributed(Dense(512, activation='relu'))
+        self.d2 = Dense(32, activation='relu')
+        self.d3 = Dense(len(target_time_offsets), activation="relu")
+        self.lstm1 = LSTM(units=64)
 
     def input_transform(self, images):
 
@@ -38,7 +41,8 @@ class cnn_lstm(Model):
         x = self.resnet50(images_)
         x = self.avg_pool(x)
         x = self.d1(x)
+        x = self.d1_1(x)
         x = self.lstm1(x)
         x = tf.concat([x, metas_], 1)
         x = self.d2(x)
-        return x
+        return self.d3(x)
