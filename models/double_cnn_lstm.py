@@ -27,20 +27,17 @@ class double_cnn_lstm(Model):
 
         self.avg_pool = TimeDistributed(GlobalAveragePooling2D())
 
-        self.d1_1 = TimeDistributed(Dense(128, activation='relu'))
-        self.d1_2 = TimeDistributed(Dense(128, activation='relu'))
-        self.lstm1 = LSTM(units=64)
-        self.lstm2 = LSTM(units=64)
-        self.d2_1 = Dense(16, activation='relu')
-        self.d2_2 = Dense(16, activation='relu')
+        self.d1_1 = TimeDistributed(Dense(1024, activation='relu'))
+        self.d1_2 = TimeDistributed(Dense(1024, activation='relu'))
+        self.d1_1_1 = TimeDistributed(Dense(512, activation='relu'))
+        self.d1_2_2 = TimeDistributed(Dense(512, activation='relu'))
+        self.lstm1 = LSTM(units=128)
+        self.lstm2 = LSTM(units=128)
+        self.d2_1 = Dense(128, activation='relu')
+        self.d2_2 = Dense(32, activation='relu')
         self.d3 = Dense(len(target_time_offsets), activation="relu")
 
     def input_transform(self, images):
-        # if images.shape[1] != 6:
-        #     return None
-
-        # when pretrained, must use the same preprocess as when the model was trained, here preprocess of resnet
-        # [batch, past_image, image_size, image_size, channel]
         batch_size = images.shape[0]
         image_size = images.shape[2] # assume square images
 
@@ -59,9 +56,6 @@ class double_cnn_lstm(Model):
 
 
     def call(self, metas, images):
-        assert not np.any(np.isnan(images))
-        # if images is None:
-        #     print(None)
 
         images = tf.dtypes.cast(images, np.float32)
         images_1, images_2 = self.input_transform(images) # (Batch size, past images (6), weight, height, nb_channel)
@@ -72,17 +66,19 @@ class double_cnn_lstm(Model):
         x_1 = self.resnet50_1(images_1)
         x_1 = self.avg_pool(x_1) #(batch size, past images, nb channels)
         x_1 = self.d1_1(x_1)
+        x_1 = self.d1_1_1(x_1)
 
         x_2 = self.resnet50_2(images_2)
         x_2 = self.avg_pool(x_2)
         x_2 = self.d1_2(x_2)
+        x_2 = self.d1_2_2(x_2)
 
         # LSTM part
         x_1 = self.lstm1(x_1)
-        x_1 = self.d2_1(x_1)
-
         x_2 = self.lstm2(x_2)
-        x_2 = self.d2_2(x_2)
 
         x = tf.concat([x_1, x_2, metas], 1)
+
+        x = self.d2_1(x)
+        x = self.d2_2(x)
         return self.d3(x)
