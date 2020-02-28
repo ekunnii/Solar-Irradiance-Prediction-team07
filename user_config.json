@@ -4,7 +4,7 @@
 
     "df_image_column": "hdf5_8bit_path",
 
-    "random_subset_of_days": "10%",
+    "random_subset_of_days": "5%",
 
     "with_pass_values": [
         "P0DT1H0M0S",
